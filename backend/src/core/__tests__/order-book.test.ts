@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { faker } from '@faker-js/faker';
-import { OrderBook } from '../order-book';
-import { CryptoOrder, OrderSide } from '../../types/trading';
+import { OrderBook } from '../order-book.js';
+import { CryptoOrder, OrderSide } from '../../types/trading.js';
 
 describe('OrderBook', () => {
   let orderBook: OrderBook;

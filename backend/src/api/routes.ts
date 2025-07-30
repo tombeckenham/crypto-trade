@@ -1,10 +1,10 @@
 import { FastifyInstance } from 'fastify';
-import { MatchingEngine } from '../core/matching-engine';
-import { CryptoOrder } from '../types/trading';
+import { MatchingEngine } from '../core/matching-engine.js';
+import { CryptoOrder } from '../types/trading.js';
 import { nanoid } from 'nanoid';
-import { marketDataService } from '../services/market-data-service';
-import { createPooledOrder, releaseOrder, orderPool } from '../utils/object-pool';
-import { simulationClient } from '../services/simulation-client';
+import { marketDataService } from '../services/market-data-service.js';
+import { createPooledOrder, releaseOrder, orderPool } from '../utils/object-pool.js';
+import { simulationClient } from '../services/simulation-client.js';
 
 interface PlaceOrderBody {
   pair: string;
@@ -134,9 +134,11 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
   });
 
   fastify.get('/api/health', async (_request, reply) => {
-    return reply.send({
+    return reply.status(200).send({
       status: 'ok',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      service: 'fluxtrade-backend',
+      version: '1.0.0'
     });
   });
 

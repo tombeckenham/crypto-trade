@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
-import { OrderBook } from './order-book';
-import { CryptoOrder, CryptoTrade } from '../types/trading';
+import { OrderBook } from './order-book.js';
+import { CryptoOrder, CryptoTrade } from '../types/trading.js';
 import { nanoid } from 'nanoid';
-import { orderPool } from '../utils/object-pool';
+import { orderPool } from '../utils/object-pool.js';
 
 /**
  * Event interface defining all events emitted by the MatchingEngine

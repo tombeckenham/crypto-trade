@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { faker } from '@faker-js/faker';
 import fastify, { FastifyInstance } from 'fastify';
-import { MatchingEngine } from '../../core/matching-engine';
-import { registerRoutes } from '../routes';
+import { MatchingEngine } from '../../core/matching-engine.js';
+import { registerRoutes } from '../routes.js';
 
 describe('API Routes Integration Tests', () => {
   let app: FastifyInstance;

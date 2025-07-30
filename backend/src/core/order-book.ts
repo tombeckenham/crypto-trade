@@ -1,5 +1,5 @@
-import { RedBlackTree } from './red-black-tree';
-import { CryptoOrder, OrderBookLevel, MarketDepth, OrderSide } from '../types/trading';
+import { RedBlackTree } from './red-black-tree.js';
+import { CryptoOrder, OrderBookLevel, MarketDepth, OrderSide } from '../types/trading.js';
 
 /**
  * High-performance order book implementation for cryptocurrency trading

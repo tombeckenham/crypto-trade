@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { faker } from '@faker-js/faker';
-import { MatchingEngine } from '../matching-engine';
-import { CryptoOrder, CryptoTrade, OrderSide } from '../../types/trading';
+import { MatchingEngine } from '../matching-engine.js';
+import { CryptoOrder, CryptoTrade, OrderSide } from '../../types/trading.js';
 
 describe('MatchingEngine', () => {
   let engine: MatchingEngine;

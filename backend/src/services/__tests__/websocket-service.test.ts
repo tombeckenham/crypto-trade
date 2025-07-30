@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { faker } from '@faker-js/faker';
 import fastify, { FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
-import { MatchingEngine } from '../../core/matching-engine';
-import { WebSocketService } from '../websocket-service';
-import { CryptoOrder } from '../../types/trading';
+import { MatchingEngine } from '../../core/matching-engine.js';
+import { WebSocketService } from '../websocket-service.js';
+import { CryptoOrder } from '../../types/trading.js';
 
 describe('WebSocket Service Tests', () => {
   let app: FastifyInstance;

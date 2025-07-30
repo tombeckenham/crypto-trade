@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { faker } from '@faker-js/faker';
-import { OrderBook } from '../order-book';
-import { MatchingEngine } from '../matching-engine';
-import { RedBlackTree } from '../red-black-tree';
-import { CryptoOrder, OrderSide } from '../../types/trading';
+import { OrderBook } from '../order-book.js';
+import { MatchingEngine } from '../matching-engine.js';
+import { RedBlackTree } from '../red-black-tree.js';
+import { CryptoOrder, OrderSide } from '../../types/trading.js';
 
 describe('Performance Tests', () => {
   describe('Red-Black Tree Performance', () => {

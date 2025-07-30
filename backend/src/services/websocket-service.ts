@@ -1,8 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
-import { MatchingEngine } from '../core/matching-engine';
-import { CryptoOrder, CryptoTrade } from '../types/trading';
-import { getErrorMessage } from '../utils/error-utils';
+import { MatchingEngine } from '../core/matching-engine.js';
+import { CryptoOrder, CryptoTrade } from '../types/trading.js';
+import { getErrorMessage } from '../utils/error-utils.js';
 
 interface WebSocketMessage {
   type: 'subscribe' | 'unsubscribe' | 'ping';
