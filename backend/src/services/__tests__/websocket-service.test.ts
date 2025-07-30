@@ -10,7 +10,7 @@ describe('WebSocket Service Tests', () => {
   let app: FastifyInstance;
   let matchingEngine: MatchingEngine;
   let wsService: WebSocketService;
-  let server: any;
+  let serverPort: number;
 
   beforeEach(async () => {
     matchingEngine = new MatchingEngine();
@@ -20,17 +20,14 @@ describe('WebSocket Service Tests', () => {
     await wsService.register(app);
     await app.ready();
     
-    // Start the server
-    server = await app.listen({ port: 0 });
-    const address = server.address();
-    server.port = address.port;
+    // Start the server and get the address
+    await app.listen({ port: 0 });
+    const address = app.server.address();
+    serverPort = typeof address === 'object' && address ? address.port : 0;
   });
 
   afterEach(async () => {
     wsService.shutdown();
-    if (server) {
-      await server.close();
-    }
     await app.close();
   });
 
@@ -52,11 +49,21 @@ describe('WebSocket Service Tests', () => {
     filledAmount: 0
   });
 
-  const connectWebSocket = (port: number): Promise<WebSocket> => {
+
+  const connectAndWaitForConnectionMessage = (port: number): Promise<{ ws: WebSocket, message: any }> => {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(`ws://localhost:${port}/ws/market`);
       
-      ws.on('open', () => resolve(ws));
+      // Set up message listener before connection is established
+      ws.once('message', (data) => {
+        try {
+          const message = JSON.parse(data.toString());
+          resolve({ ws, message });
+        } catch (error) {
+          reject(error);
+        }
+      });
+      
       ws.on('error', reject);
       
       // Timeout after 5 seconds
@@ -84,10 +91,9 @@ describe('WebSocket Service Tests', () => {
 
   describe('Connection Management', () => {
     it('should accept WebSocket connections', async () => {
-      const ws = await connectWebSocket(server.port);
+      const { ws, message } = await connectAndWaitForConnectionMessage(serverPort);
       
       // Should receive connection confirmation
-      const message = await waitForMessage(ws);
       expect(message.type).toBe('connection');
       expect(message.message).toBe('Connected to FluxTrade WebSocket');
       expect(message.timestamp).toBeTypeOf('number');
@@ -96,27 +102,22 @@ describe('WebSocket Service Tests', () => {
     });
 
     it('should handle multiple concurrent connections', async () => {
-      const connections = await Promise.all([
-        connectWebSocket(server.port),
-        connectWebSocket(server.port),
-        connectWebSocket(server.port)
+      const results = await Promise.all([
+        connectAndWaitForConnectionMessage(serverPort),
+        connectAndWaitForConnectionMessage(serverPort),
+        connectAndWaitForConnectionMessage(serverPort)
       ]);
 
       // All connections should receive welcome message
-      const messages = await Promise.all(
-        connections.map(ws => waitForMessage(ws))
-      );
-
-      messages.forEach(message => {
+      results.forEach(({ message }) => {
         expect(message.type).toBe('connection');
       });
 
-      connections.forEach(ws => ws.close());
+      results.forEach(({ ws }) => ws.close());
     });
 
     it('should handle connection cleanup on close', async () => {
-      const ws = await connectWebSocket(server.port);
-      await waitForMessage(ws); // Wait for connection message
+      const { ws } = await connectAndWaitForConnectionMessage(serverPort);
       
       // Close connection
       ws.close();
@@ -133,8 +134,8 @@ describe('WebSocket Service Tests', () => {
     let ws: WebSocket;
 
     beforeEach(async () => {
-      ws = await connectWebSocket(server.port);
-      await waitForMessage(ws); // Wait for connection message
+      const result = await connectAndWaitForConnectionMessage(serverPort);
+      ws = result.ws;
     });
 
     afterEach(() => {
@@ -228,12 +229,10 @@ describe('WebSocket Service Tests', () => {
     let ws2: WebSocket;
 
     beforeEach(async () => {
-      ws1 = await connectWebSocket(server.port);
-      ws2 = await connectWebSocket(server.port);
-      
-      // Wait for connection messages
-      await waitForMessage(ws1);
-      await waitForMessage(ws2);
+      const result1 = await connectAndWaitForConnectionMessage(serverPort);
+      const result2 = await connectAndWaitForConnectionMessage(serverPort);
+      ws1 = result1.ws;
+      ws2 = result2.ws;
     });
 
     afterEach(() => {
@@ -346,8 +345,7 @@ describe('WebSocket Service Tests', () => {
 
   describe('Error Handling', () => {
     it('should handle WebSocket errors gracefully', async () => {
-      const ws = await connectWebSocket(server.port);
-      await waitForMessage(ws); // connection message
+      const { ws } = await connectAndWaitForConnectionMessage(serverPort);
 
       // Simulate an error by sending malformed data
       const originalSend = ws.send;
@@ -365,8 +363,7 @@ describe('WebSocket Service Tests', () => {
     });
 
     it('should handle client disconnection during broadcast', async () => {
-      const ws = await connectWebSocket(server.port);
-      await waitForMessage(ws); // connection message
+      const { ws } = await connectAndWaitForConnectionMessage(serverPort);
 
       // Subscribe to trades
       ws.send(JSON.stringify({
@@ -400,8 +397,7 @@ describe('WebSocket Service Tests', () => {
       try {
         // Create multiple clients
         for (let i = 0; i < numClients; i++) {
-          const ws = await connectWebSocket(server.port);
-          await waitForMessage(ws); // connection message
+          const { ws } = await connectAndWaitForConnectionMessage(serverPort);
           clients.push(ws);
         }
 
@@ -445,8 +441,7 @@ describe('WebSocket Service Tests', () => {
     });
 
     it('should handle rapid order updates without message loss', async () => {
-      const ws = await connectWebSocket(server.port);
-      await waitForMessage(ws); // connection message
+      const { ws } = await connectAndWaitForConnectionMessage(serverPort);
 
       // Subscribe to orderbook
       ws.send(JSON.stringify({
@@ -496,8 +491,7 @@ describe('WebSocket Service Tests', () => {
 
   describe('Ping/Pong Keep-Alive', () => {
     it('should handle ping/pong for connection health', async () => {
-      const ws = await connectWebSocket(server.port);
-      await waitForMessage(ws); // connection message
+      const { ws } = await connectAndWaitForConnectionMessage(serverPort);
 
       // Send ping and expect pong
       ws.send(JSON.stringify({ type: 'ping' }));

@@ -1,5 +1,19 @@
 /**
  * Red-Black tree node colors used to maintain balance properties
+ * 
+ * Red-Black trees were chosen because they provide:
+ * 1. Guaranteed O(log n) performance for all operations
+ * 2. Self-balancing to prevent degradation
+ * 3. Efficient ordered iteration for market depth
+ * 4. Predictable latency for real-time trading
+ * 5. Memory efficiency without pre-allocation
+
+ * The alternatives either had:
+ * - Unpredictable performance (arrays, skip lists)
+ * - Missing critical operations (heaps can't iterate efficiently)
+ * - Unnecessary complexity (B+ trees are overkill for in-memory)
+
+ * For high-frequency trading where consistent sub-millisecond latency is critical, Red-Black trees provide the optimal balance of guaranteed performance across all required operations.
  * RED = 0: Red nodes allow for insertions/deletions without immediate rebalancing
  * BLACK = 1: Black nodes maintain the height balance constraint
  */
@@ -271,13 +285,13 @@ export class RedBlackTree<K, V> {
    */
   private rotateLeft(node: RBNode<K, V>): void {
     const right = node.right!;  // Right child becomes new root
-    
+
     // Move right's left subtree to node's right
     node.right = right.left;
     if (right.left) {
       right.left.parent = node;
     }
-    
+
     // Connect right to node's parent
     right.parent = node.parent;
     if (!node.parent) {
@@ -287,7 +301,7 @@ export class RedBlackTree<K, V> {
     } else {
       node.parent.right = right;
     }
-    
+
     // Make node the left child of right
     right.left = node;
     node.parent = right;
@@ -301,13 +315,13 @@ export class RedBlackTree<K, V> {
    */
   private rotateRight(node: RBNode<K, V>): void {
     const left = node.left!;  // Left child becomes new root
-    
+
     // Move left's right subtree to node's left
     node.left = left.right;
     if (left.right) {
       left.right.parent = node;
     }
-    
+
     // Connect left to node's parent
     left.parent = node.parent;
     if (!node.parent) {
@@ -317,7 +331,7 @@ export class RedBlackTree<K, V> {
     } else {
       node.parent.left = left;
     }
-    
+
     // Make node the right child of left
     left.right = node;
     node.parent = left;
@@ -448,9 +462,9 @@ export class RedBlackTree<K, V> {
           this.rotateLeft(node.parent!);
           sibling = node.parent!.right;
         }
-        if (sibling && 
-            (!sibling.left || sibling.left.color === Color.BLACK) &&
-            (!sibling.right || sibling.right.color === Color.BLACK)) {
+        if (sibling &&
+          (!sibling.left || sibling.left.color === Color.BLACK) &&
+          (!sibling.right || sibling.right.color === Color.BLACK)) {
           // Case 2: Sibling and its children are BLACK
           sibling.color = Color.RED;
           node = node.parent!;  // Move problem up the tree
@@ -481,9 +495,9 @@ export class RedBlackTree<K, V> {
           this.rotateRight(node.parent!);
           sibling = node.parent!.left;
         }
-        if (sibling && 
-            (!sibling.right || sibling.right.color === Color.BLACK) &&
-            (!sibling.left || sibling.left.color === Color.BLACK)) {
+        if (sibling &&
+          (!sibling.right || sibling.right.color === Color.BLACK) &&
+          (!sibling.left || sibling.left.color === Color.BLACK)) {
           // Case 2: Sibling and its children are BLACK
           sibling.color = Color.RED;
           node = node.parent!;  // Move problem up the tree

@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { WebSocket } from 'ws';
+import WebSocket from 'ws';
 import { MatchingEngine } from '../core/matching-engine';
 import { CryptoOrder, CryptoTrade } from '../types/trading';
 import { getErrorMessage } from '../utils/error-utils';
@@ -33,8 +33,7 @@ export class WebSocketService {
 
     const self = this;
 
-    fastify.get('/ws/market', { websocket: true }, (connection: WebSocket) => {
-      const socket = connection;
+    fastify.get('/ws/market', { websocket: true }, (socket, req) => {
       const clientId = self.generateClientId();
       const client: WebSocketClient = {
         id: clientId,
@@ -57,8 +56,7 @@ export class WebSocketService {
         self.clients.delete(clientId);
       });
 
-      socket.on('error', (error
-      ) => {
+      socket.on('error', (error: Error) => {
         console.error(`WebSocket error for client ${clientId}:`, getErrorMessage(error));
         self.clients.delete(clientId);
       });
@@ -213,7 +211,9 @@ export class WebSocketService {
     }
 
     this.clients.forEach(client => {
-      client.ws.close();
+      if (client && client.ws && typeof client.ws.close === 'function') {
+        client.ws.close();
+      }
     });
 
     this.clients.clear();
