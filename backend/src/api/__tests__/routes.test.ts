@@ -490,7 +490,7 @@ describe('API Routes Integration Tests', () => {
         }
       });
 
-      expect(response.statusCode).toBe(500); // Will fail during order processing
+      expect(response.statusCode).toBe(400); // Missing required fields
     });
   });
 
