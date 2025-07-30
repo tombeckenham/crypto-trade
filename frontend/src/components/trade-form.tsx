@@ -31,9 +31,15 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
 		case "SET_ORDER_TYPE":
 			return { ...state, type: action.orderType };
 		case "SET_PRICE":
-			return { ...state, price: action.price };
+			if (action.price === "" || /^\d*\.?\d*$/.test(action.price)) {
+				return { ...state, price: action.price };
+			}
+			return state;
 		case "SET_AMOUNT":
-			return { ...state, amount: action.amount };
+			if (action.amount === "" || /^\d*\.?\d*$/.test(action.amount)) {
+				return { ...state, amount: action.amount };
+			}
+			return state;
 		case "RESET":
 			return { side: "buy", type: "limit", price: "", amount: "" };
 		default:
@@ -59,12 +65,12 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 		const amount = parseFloat(state.amount);
 		const price = state.type === "limit" ? parseFloat(state.price) : undefined;
 
-		if (isNaN(amount) || amount <= 0) {
+		if (!state.amount || isNaN(amount) || amount <= 0) {
 			alert("Please enter a valid amount");
 			return;
 		}
 
-		if (state.type === "limit" && (!price || isNaN(price) || price <= 0)) {
+		if (state.type === "limit" && (!state.price || !price || isNaN(price) || price <= 0)) {
 			alert("Please enter a valid price");
 			return;
 		}
@@ -132,8 +138,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 
 					{state.type === "limit" && (
 						<Input
-							type="number"
-							step="0.01"
+							type="text"
 							placeholder="Price"
 							value={state.price}
 							onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -143,8 +148,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 					)}
 
 					<Input
-						type="number"
-						step="0.000001"
+						type="text"
 						placeholder="Amount"
 						value={state.amount}
 						onChange={(e: React.ChangeEvent<HTMLInputElement>) =>

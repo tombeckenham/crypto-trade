@@ -71,22 +71,50 @@ interface CandleData {
   close: number;
 }
 
-const generateMockCandles = (): CandleData[] => {
+const generateMockCandles = (interval: string = '1m', limit: number = 100): CandleData[] => {
   const now = Date.now();
   const candles = [];
   let basePrice = 50000;
 
-  for (let i = 0; i < 100; i++) {
-    const time = Math.floor((now - (100 - i) * 60000) / 1000) as Time;
-    const volatility = 0.002;
-    const open = basePrice;
-    const change = (Math.random() - 0.5) * basePrice * volatility;
-    const high = basePrice + Math.abs(change) + Math.random() * 50;
-    const low = basePrice - Math.abs(change) - Math.random() * 50;
-    const close = basePrice + change;
+  // Convert interval to milliseconds
+  const intervalMs = interval === '1m' ? 60000 : interval === '1h' ? 3600000 : 86400000;
+  
+  // Adjust volatility based on interval
+  const volatility = interval === '1m' ? 0.001 : interval === '1h' ? 0.005 : 0.02;
+  
+  // Adjust price range based on interval
+  const priceRange = interval === '1m' ? 25 : interval === '1h' ? 100 : 500;
 
-    candles.push({ time, open, high, low, close });
-    basePrice = close;
+  for (let i = 0; i < limit; i++) {
+    const time = Math.floor((now - (limit - i) * intervalMs) / 1000) as Time;
+    const open = basePrice;
+    
+    // Generate more realistic OHLC data
+    const change = (Math.random() - 0.5) * basePrice * volatility;
+    const direction = Math.sign(change);
+    
+    // High and low should make sense relative to open and close
+    const close = basePrice + change;
+    const highOffset = Math.random() * priceRange * (1 + Math.abs(volatility) * 10);
+    const lowOffset = Math.random() * priceRange * (1 + Math.abs(volatility) * 10);
+    
+    const high = Math.max(open, close) + highOffset;
+    const low = Math.min(open, close) - lowOffset;
+
+    candles.push({ 
+      time, 
+      open: Number(open.toFixed(2)), 
+      high: Number(high.toFixed(2)), 
+      low: Number(low.toFixed(2)), 
+      close: Number(close.toFixed(2)) 
+    });
+    
+    // Add some trend momentum
+    basePrice = close + (direction * Math.random() * 50);
+    
+    // Keep price in reasonable range
+    if (basePrice < 30000) basePrice = 30000 + Math.random() * 5000;
+    if (basePrice > 100000) basePrice = 70000 + Math.random() * 20000;
   }
 
   return candles;
@@ -110,7 +138,7 @@ export const useBinanceKlines = (pair: string, interval: string = '1m', limit: n
       } catch (error) {
         console.error('Failed to load Binance data:', error);
         // Fallback to mock data on error
-        return generateMockCandles();
+        return generateMockCandles(interval, limit);
       }
     },
     enabled: !!pair,
