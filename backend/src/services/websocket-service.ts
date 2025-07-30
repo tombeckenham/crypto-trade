@@ -21,6 +21,10 @@ export class WebSocketService {
   private clients: Map<string, WebSocketClient> = new Map();
   private matchingEngine: MatchingEngine;
   private pingInterval: NodeJS.Timeout | null = null;
+  private updateThrottles: Map<string, NodeJS.Timeout> = new Map();
+  private tradeBuffer: Map<string, CryptoTrade[]> = new Map();
+  private readonly UPDATE_THROTTLE_MS = 100; // Throttle updates to 10Hz max
+  private readonly MAX_TRADES_PER_BATCH = 10;
 
   constructor(matchingEngine: MatchingEngine) {
     this.matchingEngine = matchingEngine;
@@ -71,11 +75,11 @@ export class WebSocketService {
 
   private setupEventListeners(): void {
     this.matchingEngine.on('trade', (trade: CryptoTrade) => {
-      this.broadcastTrade(trade);
+      this.bufferTrade(trade);
     });
 
     this.matchingEngine.on('orderUpdate', (order: CryptoOrder) => {
-      this.broadcastOrderBookUpdate(order.pair);
+      this.throttleOrderBookUpdate(order.pair);
     });
   }
 
@@ -148,37 +152,78 @@ export class WebSocketService {
     });
   }
 
-  private broadcastTrade(trade: CryptoTrade): void {
+  private bufferTrade(trade: CryptoTrade): void {
+    if (!this.tradeBuffer.has(trade.pair)) {
+      this.tradeBuffer.set(trade.pair, []);
+    }
+    
+    const buffer = this.tradeBuffer.get(trade.pair)!;
+    buffer.push(trade);
+    
+    // Flush buffer if it gets too large or set timer to flush
+    if (buffer.length >= this.MAX_TRADES_PER_BATCH) {
+      this.flushTradeBuffer(trade.pair);
+    } else if (buffer.length === 1) {
+      // Start timer for first trade in buffer
+      setTimeout(() => this.flushTradeBuffer(trade.pair), this.UPDATE_THROTTLE_MS);
+    }
+  }
+
+  private flushTradeBuffer(pair: string): void {
+    const buffer = this.tradeBuffer.get(pair);
+    if (!buffer || buffer.length === 0) return;
+
+    const trades = buffer.splice(0, this.MAX_TRADES_PER_BATCH);
     const message = {
-      type: 'trade',
-      pair: trade.pair,
-      data: trade,
+      type: 'trades',
+      pair,
+      data: trades,
       timestamp: Date.now()
     };
 
     this.clients.forEach(client => {
       const tradeSubs = client.subscriptions.get('trades');
-      if (tradeSubs && tradeSubs.has(trade.pair)) {
+      if (tradeSubs && tradeSubs.has(pair)) {
         this.sendMessage(client, message);
       }
     });
   }
 
-  private broadcastOrderBookUpdate(pair: string): void {
-    const depth = this.matchingEngine.getMarketDepth(pair);
-    const message = {
-      type: 'orderbook',
-      pair,
-      data: depth,
-      timestamp: Date.now()
-    };
+  private throttleOrderBookUpdate(pair: string): void {
+    // Clear existing throttle for this pair
+    const existingTimeout = this.updateThrottles.get(pair);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
 
-    this.clients.forEach(client => {
-      const orderbookSubs = client.subscriptions.get('orderbook');
-      if (orderbookSubs && orderbookSubs.has(pair)) {
-        this.sendMessage(client, message);
-      }
-    });
+    // Set new throttled update
+    const timeout = setTimeout(() => {
+      this.broadcastOrderBookUpdate(pair);
+      this.updateThrottles.delete(pair);
+    }, this.UPDATE_THROTTLE_MS);
+
+    this.updateThrottles.set(pair, timeout);
+  }
+
+  private broadcastOrderBookUpdate(pair: string): void {
+    try {
+      const depth = this.matchingEngine.getMarketDepth(pair, 10); // Limit to 10 levels
+      const message = {
+        type: 'orderbook',
+        pair,
+        data: depth,
+        timestamp: Date.now()
+      };
+
+      this.clients.forEach(client => {
+        const orderbookSubs = client.subscriptions.get('orderbook');
+        if (orderbookSubs && orderbookSubs.has(pair)) {
+          this.sendMessage(client, message);
+        }
+      });
+    } catch (error) {
+      console.error(`Error broadcasting order book update for ${pair}:`, error);
+    }
   }
 
   private sendMessage(client: WebSocketClient, message: any): void {
@@ -210,6 +255,13 @@ export class WebSocketService {
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
     }
+
+    // Clear all throttle timers
+    this.updateThrottles.forEach(timeout => clearTimeout(timeout));
+    this.updateThrottles.clear();
+    
+    // Clear trade buffers
+    this.tradeBuffer.clear();
 
     this.clients.forEach(client => {
       if (client && client.ws && typeof client.ws.close === 'function') {

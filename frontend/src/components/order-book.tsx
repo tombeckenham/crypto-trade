@@ -10,13 +10,23 @@ interface OrderBookProps {
 }
 
 export const OrderBook: React.FC<OrderBookProps> = ({ bids, asks, pair, maxLevels = 15 }) => {
+  // Filter out invalid levels and calculate maxTotal safely
+  const validBids = bids.filter(b => b && typeof b.total === 'number' && !isNaN(b.total));
+  const validAsks = asks.filter(a => a && typeof a.total === 'number' && !isNaN(a.total));
+  
   const maxTotal = Math.max(
-    ...bids.map(b => b.total),
-    ...asks.map(a => a.total)
+    0,
+    ...validBids.map(b => b.total),
+    ...validAsks.map(a => a.total)
   );
 
   const renderLevel = (level: OrderBookLevel, type: 'bid' | 'ask') => {
-    const percentage = (level.total / maxTotal) * 100;
+    // Skip invalid levels with null/undefined values
+    if (!level || typeof level.price !== 'number' || typeof level.amount !== 'number' || typeof level.total !== 'number') {
+      return null;
+    }
+    
+    const percentage = maxTotal > 0 ? (level.total / maxTotal) * 100 : 0;
     const isAsk = type === 'ask';
     
     return (
@@ -53,15 +63,22 @@ export const OrderBook: React.FC<OrderBookProps> = ({ bids, asks, pair, maxLevel
 
         <div className="flex-1 min-h-0">
           <div className="max-h-[300px] overflow-auto">
-            {asks.slice(0, maxLevels).reverse().map(ask => renderLevel(ask, 'ask'))}
+            {validAsks.slice(0, maxLevels).reverse().map(ask => renderLevel(ask, 'ask')).filter(Boolean)}
           </div>
           
           <div className="h-10 flex items-center justify-center border-t border-b font-bold text-base">
-            Spread: {((asks[0]?.price || 0) - (bids[0]?.price || 0)).toFixed(2)}
+            Spread: {(() => {
+              const bestAsk = validAsks[0]?.price;
+              const bestBid = validBids[0]?.price;
+              if (typeof bestAsk === 'number' && typeof bestBid === 'number') {
+                return (bestAsk - bestBid).toFixed(2);
+              }
+              return 'N/A';
+            })()}
           </div>
           
           <div className="max-h-[300px] overflow-auto">
-            {bids.slice(0, maxLevels).map(bid => renderLevel(bid, 'bid'))}
+            {validBids.slice(0, maxLevels).map(bid => renderLevel(bid, 'bid')).filter(Boolean)}
           </div>
         </div>
       </CardContent>

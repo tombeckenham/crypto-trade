@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { OrderBook } from './order-book';
 import { CryptoOrder, CryptoTrade } from '../types/trading';
 import { nanoid } from 'nanoid';
+import { orderPool } from '../utils/object-pool';
 
 /**
  * Event interface defining all events emitted by the MatchingEngine
@@ -34,6 +35,14 @@ export class MatchingEngine extends EventEmitter {
   private tradeSequence: number;                        // Incrementing counter for trade ordering
   private readonly makerFeeRate: number;               // Fee rate for liquidity providers (makers)
   private readonly takerFeeRate: number;               // Fee rate for liquidity consumers (takers)
+  
+  // Memory protection and performance monitoring
+  private orderCount: number = 0;                      // Total orders processed
+  private tradeCount: number = 0;                      // Total trades executed
+  private lastMemoryCheck: number = Date.now();       // Last memory monitoring timestamp
+  private readonly maxOrdersPerSecond: number = 50000; // Circuit breaker limit
+  private readonly memoryCheckInterval: number = 5000;  // Check memory every 5 seconds
+  private recentOrderTimestamps: number[] = [];        // For rate limiting
 
   /**
    * Creates a new matching engine with configurable fee structure
@@ -101,6 +110,13 @@ export class MatchingEngine extends EventEmitter {
    * @param order - Order to submit for execution
    */
   submitOrder(order: CryptoOrder): void {
+    // Memory protection and rate limiting
+    if (!this.checkMemoryAndRateLimit()) {
+      order.status = 'cancelled';
+      this.emit('orderUpdate', order);
+      return;
+    }
+
     // Reject zero-amount orders
     if (order.amount <= 0) {
       order.status = 'cancelled';
@@ -108,6 +124,7 @@ export class MatchingEngine extends EventEmitter {
       return;
     }
 
+    this.orderCount++;
     const orderBook = this.getOrCreateOrderBook(order.pair);
 
     // Route to specific execution logic based on order type
@@ -116,6 +133,9 @@ export class MatchingEngine extends EventEmitter {
     } else {
       this.executeLimitOrder(order, orderBook);   // Execute with price constraints
     }
+
+    // Clean up processed orders periodically
+    this.performPeriodicCleanup();
   }
 
   /**
@@ -320,6 +340,7 @@ export class MatchingEngine extends EventEmitter {
 
     // Increment sequence counter for trade ordering
     this.tradeSequence++;
+    this.tradeCount++;
     
     // Emit trade event for real-time notifications
     this.emit('trade', trade);
@@ -375,5 +396,93 @@ export class MatchingEngine extends EventEmitter {
    */
   getSupportedPairs(): string[] {
     return Array.from(this.orderBooks.keys());
+  }
+
+  /**
+   * Memory protection and rate limiting check
+   * Prevents system overload during high-volume periods
+   * @returns true if order can be processed, false if rate limited
+   */
+  private checkMemoryAndRateLimit(): boolean {
+    const now = Date.now();
+    
+    // Clean old timestamps (keep only last second)
+    this.recentOrderTimestamps = this.recentOrderTimestamps.filter(
+      timestamp => now - timestamp < 1000
+    );
+    
+    // Rate limiting check
+    if (this.recentOrderTimestamps.length >= this.maxOrdersPerSecond) {
+      console.warn(`Rate limit exceeded: ${this.recentOrderTimestamps.length} orders/sec`);
+      return false;
+    }
+    
+    this.recentOrderTimestamps.push(now);
+    
+    // Memory check every 5 seconds
+    if (now - this.lastMemoryCheck > this.memoryCheckInterval) {
+      const memUsage = process.memoryUsage();
+      const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+      
+      console.log(`MatchingEngine Stats: ${heapUsedMB}MB heap, ${this.orderCount} orders, ${this.tradeCount} trades, ${orderPool.getPoolSize()} pooled`);
+      
+      if (heapUsedMB > 3500) { // Warning at 3.5GB
+        console.warn('MatchingEngine: High memory usage detected');
+        if (global.gc) {
+          global.gc();
+        }
+        
+        // Emergency rate limiting if memory is very high
+        if (heapUsedMB > 4000) {
+          console.error('MatchingEngine: Emergency rate limiting activated');
+          return false;
+        }
+      }
+      
+      this.lastMemoryCheck = now;
+    }
+    
+    return true;
+  }
+
+  /**
+   * Periodic cleanup of processed orders and expired data
+   * Helps maintain stable memory usage during extended operation
+   */
+  private performPeriodicCleanup(): void {
+    // Cleanup every 1000 orders
+    if (this.orderCount % 1000 === 0) {
+      // Clean up filled orders from order books
+      this.orderBooks.forEach((_orderBook, pair) => {
+        const stats = this.getOrderBookStats(pair);
+        
+        // If order book becomes too large, it might indicate memory issues
+        if (stats.orderCount > 10000) {
+          console.warn(`Large order book detected for ${pair}: ${stats.orderCount} orders`);
+        }
+      });
+      
+      // Trim old timestamps more aggressively during cleanup
+      const now = Date.now();
+      this.recentOrderTimestamps = this.recentOrderTimestamps.filter(
+        timestamp => now - timestamp < 500 // Keep only last 500ms
+      );
+    }
+  }
+
+  /**
+   * Get comprehensive engine performance statistics
+   * Used for monitoring and debugging high-volume scenarios
+   */
+  getEngineStats() {
+    return {
+      orderCount: this.orderCount,
+      tradeCount: this.tradeCount,
+      tradeSequence: this.tradeSequence,
+      recentOrdersPerSecond: this.recentOrderTimestamps.length,
+      supportedPairs: this.getSupportedPairs().length,
+      poolSize: orderPool.getPoolSize(),
+      memoryUsage: process.memoryUsage()
+    };
   }
 }

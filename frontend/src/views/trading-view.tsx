@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from "react";
 import { OrderBook } from "../components/order-book";
 import { TradeForm } from "../components/trade-form";
 import { PriceChart } from "../components/price-chart";
+import { SimulationControls } from "../components/simulation-controls";
+import { VolumeMetrics } from "../components/volume-metrics";
 import {
 	useOrderBook,
 	usePlaceOrder,
@@ -28,6 +30,7 @@ export const TradingView: React.FC = () => {
 		setConnectionStatus,
 	} = useTradingStore();
 	const [wsOrderBook, setWsOrderBook] = useState<MarketDepth | null>(null);
+	const [isSimulating, setIsSimulating] = useState(false);
 	const isConnecting = useRef(false);
 
 	const { data: orderBook } = useOrderBook(selectedPair);
@@ -82,7 +85,7 @@ export const TradingView: React.FC = () => {
 	const currentOrderBook = wsOrderBook || orderBook;
 
 	return (
-		<div className="flex flex-col h-screen bg-background text-foreground dark">
+		<div className="flex flex-col bg-background text-foreground dark">
 			<header className="flex items-center justify-between p-6 border-b">
 				<h1 className="text-2xl font-bold">FluxTrade</h1>
 
@@ -130,15 +133,20 @@ export const TradingView: React.FC = () => {
 					</Card>
 
 					<div className="flex gap-6 flex-1">
-						<div className="flex-1">
+						<div className="flex-1 space-y-6">
 							<TradeForm
 								pair={selectedPair}
 								userId={userId}
 								onSubmit={(order) => placeOrder.mutate(order)}
 							/>
+
+							<SimulationControls
+								selectedPair={selectedPair}
+								onSimulationStateChange={setIsSimulating}
+							/>
 						</div>
 
-						<div className="flex-1">
+						<div className="flex-1 space-y-6">
 							{currentOrderBook && (
 								<Card>
 									<CardContent className="p-6">
@@ -150,6 +158,8 @@ export const TradingView: React.FC = () => {
 									</CardContent>
 								</Card>
 							)}
+
+							<VolumeMetrics pair={selectedPair} isSimulating={isSimulating} />
 						</div>
 					</div>
 				</div>

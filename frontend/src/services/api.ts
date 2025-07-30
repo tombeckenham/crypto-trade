@@ -63,5 +63,14 @@ export const api = {
   async getPairs(): Promise<{ pairs: TradingPair[] }> {
     const response = await fetch(`${API_BASE_URL}/pairs`);
     return handleResponse(response);
+  },
+
+  async startSimulation(ordersPerSecond: number, durationSeconds: number, pair: string) {
+    const response = await fetch(`${API_BASE_URL}/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ordersPerSecond, durationSeconds, pair })
+    });
+    return handleResponse(response);
   }
 };
