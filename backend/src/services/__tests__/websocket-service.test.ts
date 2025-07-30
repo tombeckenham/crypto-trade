@@ -298,11 +298,13 @@ describe('WebSocket Service Tests', () => {
 
       // ws1 should receive trade notification
       const tradeMessage = await waitForMessage(ws1);
-      expect(tradeMessage.type).toBe('trade');
+      expect(tradeMessage.type).toBe('trades');
       expect(tradeMessage.pair).toBe('BTC-USDT');
       expect(tradeMessage.data).toBeDefined();
-      expect(tradeMessage.data.price).toBe(50000);
-      expect(tradeMessage.data.amount).toBe(1.0);
+      expect(Array.isArray(tradeMessage.data)).toBe(true);
+      expect(tradeMessage.data.length).toBeGreaterThan(0);
+      expect(tradeMessage.data[0].price).toBe(50000);
+      expect(tradeMessage.data[0].amount).toBe(1.0);
 
       // ws2 should not receive anything (not subscribed)
       // We can't easily test negative case without complex timing
@@ -414,7 +416,7 @@ describe('WebSocket Service Tests', () => {
 
       // Only ws1 should receive the trade update
       const message = await waitForMessage(ws1);
-      expect(message.type).toBe('trade');
+      expect(message.type).toBe('trades');
       expect(message.pair).toBe('BTC-USDT');
 
       // ws2 should not receive anything for BTC-USDT
@@ -569,18 +571,30 @@ describe('WebSocket Service Tests', () => {
 
       const messagePromise = new Promise<void>((resolve) => {
         let messageCount = 0;
-        const expectedMessages = 5;
+        let lastMessageTime = Date.now();
 
-        ws.on('message', (data) => {
+        const messageHandler = (data: Buffer) => {
           const message = JSON.parse(data.toString());
           if (message.type === 'orderbook') {
             updateMessages.push(message);
             messageCount++;
-            if (messageCount >= expectedMessages) {
-              resolve();
-            }
+            lastMessageTime = Date.now();
           }
-        });
+        };
+
+        ws.on('message', messageHandler);
+
+        // Since updates are throttled, wait for messages to stop arriving
+        const checkComplete = () => {
+          if (messageCount > 0 && Date.now() - lastMessageTime > 200) {
+            ws.off('message', messageHandler);
+            resolve();
+          } else {
+            setTimeout(checkComplete, 50);
+          }
+        };
+
+        setTimeout(checkComplete, 150); // Start checking after throttle period
       });
 
       // Submit multiple rapid orders
@@ -592,7 +606,9 @@ describe('WebSocket Service Tests', () => {
       // Wait for all messages
       await messagePromise;
 
-      expect(updateMessages.length).toBe(5);
+      // Due to throttling, we should have at least 1 update but likely fewer than 5
+      expect(updateMessages.length).toBeGreaterThan(0);
+      expect(updateMessages.length).toBeLessThanOrEqual(5);
       updateMessages.forEach(message => {
         expect(message.type).toBe('orderbook');
         expect(message.data).toBeDefined();
