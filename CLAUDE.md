@@ -100,6 +100,11 @@ FluxTrade is a high-performance trading system demonstrating ultra-high volume o
 - Performance-critical sections clearly marked
 - No comments unless specifically requested by user
 
+## TypeScript Guidelines
+
+- Avoid using any type and avoid casting type
+- Try to correct the type at the source
+
 ## Package Management
 
 - Always use pnpm, and when adding modules use pnpm add instead of altering the package.json

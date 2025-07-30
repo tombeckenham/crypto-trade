@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { WebSocket } from 'ws';
 import { MatchingEngine } from '../core/matching-engine';
 import { CryptoOrder, CryptoTrade } from '../types/trading';
+import { getErrorMessage } from '../utils/error-utils';
 
 interface WebSocketMessage {
   type: 'subscribe' | 'unsubscribe' | 'ping';
@@ -32,7 +33,7 @@ export class WebSocketService {
 
     const self = this;
 
-    fastify.get('/ws/market', { websocket: true } as any, (connection: any) => {
+    fastify.get('/ws/market', { websocket: true }, (connection: WebSocket) => {
       const socket = connection;
       const clientId = self.generateClientId();
       const client: WebSocketClient = {
@@ -56,8 +57,9 @@ export class WebSocketService {
         self.clients.delete(clientId);
       });
 
-      socket.on('error', (error: any) => {
-        console.error(`WebSocket error for client ${clientId}:`, error);
+      socket.on('error', (error
+      ) => {
+        console.error(`WebSocket error for client ${clientId}:`, getErrorMessage(error));
         self.clients.delete(clientId);
       });
 

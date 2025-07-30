@@ -1,12 +1,23 @@
 import { RedBlackTree } from './red-black-tree';
 import { CryptoOrder, OrderBookLevel, MarketDepth, OrderSide } from '../types/trading';
 
+/**
+ * High-performance order book implementation for cryptocurrency trading
+ * Uses Red-Black trees for O(log n) price level operations and maintains
+ * separate bid/ask sides with efficient order matching capabilities
+ * 
+ * Key features:
+ * - Sub-millisecond order insertion/removal
+ * - Efficient best bid/ask price retrieval
+ * - Real-time market depth calculation
+ * - Automatic order status management
+ */
 export class OrderBook {
-  private readonly pair: string;
-  private readonly bids: RedBlackTree<number, OrderBookLevel>;
-  private readonly asks: RedBlackTree<number, OrderBookLevel>;
-  private readonly orderMap: Map<string, CryptoOrder>;
-  private lastUpdateTime: number;
+  private readonly pair: string;                                    // Trading pair (e.g., "BTC-USDT")
+  private readonly bids: RedBlackTree<number, OrderBookLevel>;     // Buy orders (descending price order)
+  private readonly asks: RedBlackTree<number, OrderBookLevel>;     // Sell orders (ascending price order)
+  private readonly orderMap: Map<string, CryptoOrder>;             // Fast O(1) order lookup by ID
+  private lastUpdateTime: number;                                   // Timestamp of last modification
 
   constructor(pair: string) {
     this.pair = pair;
@@ -166,8 +177,13 @@ export class OrderBook {
   }
 
   clear(): void {
-    this.bids.constructor.call(this.bids, (a: number, b: number) => b - a);
-    this.asks.constructor.call(this.asks, (a: number, b: number) => a - b);
+    // Clear all nodes from the trees by removing them individually
+    const bidKeys = Array.from(this.bids.inOrderTraversal()).map(item => item.key);
+    const askKeys = Array.from(this.asks.inOrderTraversal()).map(item => item.key);
+    
+    bidKeys.forEach(key => this.bids.remove(key));
+    askKeys.forEach(key => this.asks.remove(key));
+    
     this.orderMap.clear();
     this.lastUpdateTime = Date.now();
   }
