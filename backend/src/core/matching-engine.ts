@@ -101,6 +101,13 @@ export class MatchingEngine extends EventEmitter {
    * @param order - Order to submit for execution
    */
   submitOrder(order: CryptoOrder): void {
+    // Reject zero-amount orders
+    if (order.amount <= 0) {
+      order.status = 'cancelled';
+      this.emit('orderUpdate', order);
+      return;
+    }
+
     const orderBook = this.getOrCreateOrderBook(order.pair);
 
     // Route to specific execution logic based on order type
