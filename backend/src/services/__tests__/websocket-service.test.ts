@@ -16,10 +16,10 @@ describe('WebSocket Service Tests', () => {
     matchingEngine = new MatchingEngine();
     wsService = new WebSocketService(matchingEngine);
     app = fastify({ logger: false });
-    
+
     await wsService.register(app);
     await app.ready();
-    
+
     // Start the server and get the address
     await app.listen({ port: 0 });
     const address = app.server.address();
@@ -53,7 +53,7 @@ describe('WebSocket Service Tests', () => {
   const connectAndWaitForConnectionMessage = (port: number): Promise<{ ws: WebSocket, message: any }> => {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(`ws://localhost:${port}/ws/market`);
-      
+
       // Set up message listener before connection is established
       ws.once('message', (data) => {
         try {
@@ -63,9 +63,9 @@ describe('WebSocket Service Tests', () => {
           reject(error);
         }
       });
-      
+
       ws.on('error', reject);
-      
+
       // Timeout after 5 seconds
       setTimeout(() => reject(new Error('Connection timeout')), 5000);
     });
@@ -92,12 +92,12 @@ describe('WebSocket Service Tests', () => {
   describe('Connection Management', () => {
     it('should accept WebSocket connections', async () => {
       const { ws, message } = await connectAndWaitForConnectionMessage(serverPort);
-      
+
       // Should receive connection confirmation
       expect(message.type).toBe('connection');
       expect(message.message).toBe('Connected to FluxTrade WebSocket');
       expect(message.timestamp).toBeTypeOf('number');
-      
+
       ws.close();
     });
 
@@ -118,13 +118,13 @@ describe('WebSocket Service Tests', () => {
 
     it('should handle connection cleanup on close', async () => {
       const { ws } = await connectAndWaitForConnectionMessage(serverPort);
-      
+
       // Close connection
       ws.close();
-      
+
       // Give time for cleanup
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Should not throw errors (client should be removed from internal map)
       expect(() => wsService.shutdown()).not.toThrow();
     });
@@ -146,7 +146,7 @@ describe('WebSocket Service Tests', () => {
 
     it('should handle orderbook subscription', async () => {
       const messages: any[] = [];
-      
+
       // Set up message collector
       const messageCollector = new Promise<void>((resolve) => {
         let messageCount = 0;
@@ -200,7 +200,7 @@ describe('WebSocket Service Tests', () => {
     it('should handle unsubscription', async () => {
       const messages: any[] = [];
       let messageCount = 0;
-      
+
       // Set up message collector for subscription phase
       const subscriptionPromise = new Promise<void>((resolve) => {
         const handler = (data: Buffer) => {
@@ -221,7 +221,7 @@ describe('WebSocket Service Tests', () => {
         channel: 'orderbook',
         pair: 'BTC-USDT'
       }));
-      
+
       await subscriptionPromise; // Wait for subscription confirmation and initial orderbook data
 
       // Now set up for unsubscription message
@@ -316,7 +316,7 @@ describe('WebSocket Service Tests', () => {
       try {
         const messages1: any[] = [];
         const messages2: any[] = [];
-        
+
         // Set up message collectors for both clients
         const subscriptionPromise1 = new Promise<void>((resolve) => {
           let messageCount = 0;
@@ -352,7 +352,7 @@ describe('WebSocket Service Tests', () => {
           channel: 'orderbook',
           pair: 'BTC-USDT'
         }));
-        
+
         testWs2.send(JSON.stringify({
           type: 'subscribe',
           channel: 'orderbook',
@@ -486,6 +486,9 @@ describe('WebSocket Service Tests', () => {
             let messageCount = 0;
             const handler = (data: Buffer) => {
               const message = JSON.parse(data.toString());
+              if (message.type === 'orderbook') {
+                console.log('Orderbook message received:', message.pair);
+              }
               messageCount++;
               if (messageCount >= 2) { // subscription + initial orderbook
                 ws.off('message', handler);
@@ -535,7 +538,7 @@ describe('WebSocket Service Tests', () => {
       const { ws } = await connectAndWaitForConnectionMessage(serverPort);
 
       const messages: any[] = [];
-      
+
       // Set up subscription message collector
       const subscriptionPromise = new Promise<void>((resolve) => {
         let messageCount = 0;
@@ -557,13 +560,13 @@ describe('WebSocket Service Tests', () => {
         channel: 'orderbook',
         pair: 'BTC-USDT'
       }));
-      
+
       await subscriptionPromise;
 
       // Clear previous messages and set up for orderbook updates
       messages.length = 0;
       const updateMessages: any[] = [];
-      
+
       const messagePromise = new Promise<void>((resolve) => {
         let messageCount = 0;
         const expectedMessages = 5;
@@ -606,7 +609,7 @@ describe('WebSocket Service Tests', () => {
       // Send ping and expect pong
       ws.send(JSON.stringify({ type: 'ping' }));
       const pongMessage = await waitForMessage(ws);
-      
+
       expect(pongMessage.type).toBe('pong');
       expect(pongMessage.timestamp).toBeTypeOf('number');
 
