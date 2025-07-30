@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
 	createChart,
 	ColorType,
@@ -8,6 +8,7 @@ import {
 	type Time,
 } from "lightweight-charts";
 import { type CryptoTrade } from "../types/trading";
+import { binanceAPI, type CandlestickData } from "../services/binance-api";
 
 interface PriceChartProps {
 	trades: CryptoTrade[];
@@ -18,6 +19,8 @@ export const PriceChart: React.FC<PriceChartProps> = ({ trades, pair }) => {
 	const chartContainerRef = useRef<HTMLDivElement>(null);
 	const chartRef = useRef<IChartApi | null>(null);
 	const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+	const [isLoading, setIsLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!chartContainerRef.current) return;
@@ -67,31 +70,59 @@ export const PriceChart: React.FC<PriceChartProps> = ({ trades, pair }) => {
 	}, []);
 
 	useEffect(() => {
-		if (!candleSeriesRef.current || trades.length === 0) return;
+		if (!candleSeriesRef.current || !pair) return;
 
-		const generateMockCandles = () => {
-			const now = Date.now();
-			const candles = [];
-			let basePrice = 50000;
+		const loadBinanceData = async () => {
+			setIsLoading(true);
+			setError(null);
 
-			for (let i = 0; i < 100; i++) {
-				const time = Math.floor((now - (100 - i) * 60000) / 1000) as Time;
-				const volatility = 0.002;
-				const open = basePrice;
-				const change = (Math.random() - 0.5) * basePrice * volatility;
-				const high = basePrice + Math.abs(change) + Math.random() * 50;
-				const low = basePrice - Math.abs(change) - Math.random() * 50;
-				const close = basePrice + change;
+			try {
+				const binanceSymbol = binanceAPI.convertPairToBinanceSymbol(pair);
+				const candlestickData = await binanceAPI.getKlines(binanceSymbol, '1m', 100);
+				
+				const formattedData = candlestickData.map(candle => ({
+					time: candle.time as Time,
+					open: candle.open,
+					high: candle.high,
+					low: candle.low,
+					close: candle.close,
+				}));
 
-				candles.push({ time, open, high, low, close });
-				basePrice = close;
+				candleSeriesRef.current?.setData(formattedData);
+			} catch (err) {
+				console.error('Failed to load Binance data:', err);
+				setError('Failed to load price data');
+				
+				// Fallback to mock data
+				const generateMockCandles = () => {
+					const now = Date.now();
+					const candles = [];
+					let basePrice = 50000;
+
+					for (let i = 0; i < 100; i++) {
+						const time = Math.floor((now - (100 - i) * 60000) / 1000) as Time;
+						const volatility = 0.002;
+						const open = basePrice;
+						const change = (Math.random() - 0.5) * basePrice * volatility;
+						const high = basePrice + Math.abs(change) + Math.random() * 50;
+						const low = basePrice - Math.abs(change) - Math.random() * 50;
+						const close = basePrice + change;
+
+						candles.push({ time, open, high, low, close });
+						basePrice = close;
+					}
+
+					return candles;
+				};
+
+				candleSeriesRef.current?.setData(generateMockCandles());
+			} finally {
+				setIsLoading(false);
 			}
-
-			return candles;
 		};
 
-		candleSeriesRef.current.setData(generateMockCandles());
-	}, [trades]);
+		loadBinanceData();
+	}, [pair]);
 
 	return (
 		<div
@@ -106,9 +137,22 @@ export const PriceChart: React.FC<PriceChartProps> = ({ trades, pair }) => {
 					marginBottom: "16px",
 					color: "#e0e0e0",
 					fontWeight: "bold",
+					display: "flex",
+					justifyContent: "space-between",
+					alignItems: "center",
 				}}
 			>
-				{pair} Price Chart
+				<span>{pair} Price Chart</span>
+				{isLoading && (
+					<span style={{ fontSize: "12px", color: "#ffa726" }}>
+						Loading...
+					</span>
+				)}
+				{error && (
+					<span style={{ fontSize: "12px", color: "#ef5350" }}>
+						{error} (using mock data)
+					</span>
+				)}
 			</div>
 			<div ref={chartContainerRef} />
 		</div>
