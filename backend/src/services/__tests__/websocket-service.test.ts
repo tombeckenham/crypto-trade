@@ -145,6 +145,21 @@ describe('WebSocket Service Tests', () => {
     });
 
     it('should handle orderbook subscription', async () => {
+      const messages: any[] = [];
+      
+      // Set up message collector
+      const messageCollector = new Promise<void>((resolve) => {
+        let messageCount = 0;
+        ws.on('message', (data) => {
+          const message = JSON.parse(data.toString());
+          messages.push(message);
+          messageCount++;
+          if (messageCount >= 2) {
+            resolve();
+          }
+        });
+      });
+
       // Subscribe to orderbook
       ws.send(JSON.stringify({
         type: 'subscribe',
@@ -152,19 +167,20 @@ describe('WebSocket Service Tests', () => {
         pair: 'BTC-USDT'
       }));
 
-      // Should receive subscription confirmation
-      const subMessage = await waitForMessage(ws);
-      expect(subMessage.type).toBe('subscribed');
-      expect(subMessage.channel).toBe('orderbook');
-      expect(subMessage.pair).toBe('BTC-USDT');
+      // Wait for both messages
+      await messageCollector;
 
-      // Should receive initial orderbook data
-      const orderBookMessage = await waitForMessage(ws);
-      expect(orderBookMessage.type).toBe('orderbook');
-      expect(orderBookMessage.pair).toBe('BTC-USDT');
-      expect(orderBookMessage.data).toBeDefined();
-      expect(orderBookMessage.data.bids).toBeInstanceOf(Array);
-      expect(orderBookMessage.data.asks).toBeInstanceOf(Array);
+      // Should receive subscription confirmation first
+      expect(messages[0].type).toBe('subscribed');
+      expect(messages[0].channel).toBe('orderbook');
+      expect(messages[0].pair).toBe('BTC-USDT');
+
+      // Should receive initial orderbook data second
+      expect(messages[1].type).toBe('orderbook');
+      expect(messages[1].pair).toBe('BTC-USDT');
+      expect(messages[1].data).toBeDefined();
+      expect(messages[1].data.bids).toBeInstanceOf(Array);
+      expect(messages[1].data.asks).toBeInstanceOf(Array);
     });
 
     it('should handle trades subscription', async () => {
@@ -182,6 +198,23 @@ describe('WebSocket Service Tests', () => {
     });
 
     it('should handle unsubscription', async () => {
+      const messages: any[] = [];
+      let messageCount = 0;
+      
+      // Set up message collector for subscription phase
+      const subscriptionPromise = new Promise<void>((resolve) => {
+        const handler = (data: Buffer) => {
+          const message = JSON.parse(data.toString());
+          messages.push(message);
+          messageCount++;
+          if (messageCount >= 2) {
+            ws.off('message', handler);
+            resolve();
+          }
+        };
+        ws.on('message', handler);
+      });
+
       // First subscribe
       ws.send(JSON.stringify({
         type: 'subscribe',
@@ -189,8 +222,10 @@ describe('WebSocket Service Tests', () => {
         pair: 'BTC-USDT'
       }));
       
-      await waitForMessage(ws); // subscription confirmation
-      await waitForMessage(ws); // initial orderbook data
+      await subscriptionPromise; // Wait for subscription confirmation and initial orderbook data
+
+      // Now set up for unsubscription message
+      const unsubscribePromise = waitForMessage(ws);
 
       // Then unsubscribe
       ws.send(JSON.stringify({
@@ -199,10 +234,10 @@ describe('WebSocket Service Tests', () => {
         pair: 'BTC-USDT'
       }));
 
-      const message = await waitForMessage(ws);
-      expect(message.type).toBe('unsubscribed');
-      expect(message.channel).toBe('orderbook');
-      expect(message.pair).toBe('BTC-USDT');
+      const unsubMessage = await unsubscribePromise;
+      expect(unsubMessage.type).toBe('unsubscribed');
+      expect(unsubMessage.channel).toBe('orderbook');
+      expect(unsubMessage.pair).toBe('BTC-USDT');
     });
 
     it('should handle ping/pong', async () => {
@@ -279,6 +314,38 @@ describe('WebSocket Service Tests', () => {
       const { ws: testWs2 } = await connectAndWaitForConnectionMessage(serverPort);
 
       try {
+        const messages1: any[] = [];
+        const messages2: any[] = [];
+        
+        // Set up message collectors for both clients
+        const subscriptionPromise1 = new Promise<void>((resolve) => {
+          let messageCount = 0;
+          const handler = (data: Buffer) => {
+            const message = JSON.parse(data.toString());
+            messages1.push(message);
+            messageCount++;
+            if (messageCount >= 2) { // subscription + initial orderbook
+              testWs1.off('message', handler);
+              resolve();
+            }
+          };
+          testWs1.on('message', handler);
+        });
+
+        const subscriptionPromise2 = new Promise<void>((resolve) => {
+          let messageCount = 0;
+          const handler = (data: Buffer) => {
+            const message = JSON.parse(data.toString());
+            messages2.push(message);
+            messageCount++;
+            if (messageCount >= 2) { // subscription + initial orderbook
+              testWs2.off('message', handler);
+              resolve();
+            }
+          };
+          testWs2.on('message', handler);
+        });
+
         // Both clients subscribe to orderbook
         testWs1.send(JSON.stringify({
           type: 'subscribe',
@@ -293,13 +360,11 @@ describe('WebSocket Service Tests', () => {
         }));
 
         // Wait for subscriptions and initial data
-        await waitForMessage(testWs1); // subscription
-        await waitForMessage(testWs1); // initial orderbook
-        await waitForMessage(testWs2); // subscription
-        await waitForMessage(testWs2); // initial orderbook
+        await Promise.all([subscriptionPromise1, subscriptionPromise2]);
 
-        // Add a small delay to ensure clients are fully registered
-        await new Promise(resolve => setTimeout(resolve, 10));
+        // Set up listeners for orderbook updates
+        const updatePromise1 = waitForMessage(testWs1);
+        const updatePromise2 = waitForMessage(testWs2);
 
         // Add multiple orders to trigger orderbook updates
         const order1 = createTestOrder('buy', 49000, 1.0);
@@ -307,9 +372,8 @@ describe('WebSocket Service Tests', () => {
         matchingEngine.submitOrder(order1);
         matchingEngine.submitOrder(order2);
 
-        // Both clients should receive orderbook updates (we'll check the first one)
-        const message1 = await waitForMessage(testWs1);
-        const message2 = await waitForMessage(testWs2);
+        // Both clients should receive orderbook updates
+        const [message1, message2] = await Promise.all([updatePromise1, updatePromise2]);
 
         [message1, message2].forEach(message => {
           expect(message.type).toBe('orderbook');
@@ -416,31 +480,40 @@ describe('WebSocket Service Tests', () => {
           clients.push(ws);
         }
 
-        // Subscribe all clients to orderbook
-        const subscriptionPromises = clients.map(async (ws) => {
-          ws.send(JSON.stringify({
-            type: 'subscribe',
-            channel: 'orderbook',
-            pair: 'BTC-USDT'
-          }));
-          return waitForMessage(ws); // subscription confirmation
+        // Set up message collectors for all clients
+        const subscriptionPromises = clients.map((ws) => {
+          return new Promise<void>((resolve) => {
+            let messageCount = 0;
+            const handler = (data: Buffer) => {
+              const message = JSON.parse(data.toString());
+              messageCount++;
+              if (messageCount >= 2) { // subscription + initial orderbook
+                ws.off('message', handler);
+                resolve();
+              }
+            };
+            ws.on('message', handler);
+
+            // Send subscription after setting up the handler
+            ws.send(JSON.stringify({
+              type: 'subscribe',
+              channel: 'orderbook',
+              pair: 'BTC-USDT'
+            }));
+          });
         });
 
+        // Wait for all subscriptions to complete
         await Promise.all(subscriptionPromises);
 
-        // Wait for initial orderbook data
-        const initialDataPromises = clients.map(ws => waitForMessage(ws));
-        await Promise.all(initialDataPromises);
-
-        // Add a small delay to ensure clients are fully registered
-        await new Promise(resolve => setTimeout(resolve, 10));
+        // Set up listeners for orderbook updates
+        const updatePromises = clients.map(ws => waitForMessage(ws));
 
         // Trigger an orderbook update
         const order = createTestOrder('buy', 49000, 1.0);
         matchingEngine.submitOrder(order);
 
         // All clients should receive the update
-        const updatePromises = clients.map(ws => waitForMessage(ws));
         const updates = await Promise.all(updatePromises);
 
         updates.forEach(update => {
@@ -461,6 +534,23 @@ describe('WebSocket Service Tests', () => {
     it('should handle rapid order updates without message loss', async () => {
       const { ws } = await connectAndWaitForConnectionMessage(serverPort);
 
+      const messages: any[] = [];
+      
+      // Set up subscription message collector
+      const subscriptionPromise = new Promise<void>((resolve) => {
+        let messageCount = 0;
+        const handler = (data: Buffer) => {
+          const message = JSON.parse(data.toString());
+          messages.push(message);
+          messageCount++;
+          if (messageCount >= 2) { // subscription + initial orderbook
+            ws.off('message', handler);
+            resolve();
+          }
+        };
+        ws.on('message', handler);
+      });
+
       // Subscribe to orderbook
       ws.send(JSON.stringify({
         type: 'subscribe',
@@ -468,10 +558,12 @@ describe('WebSocket Service Tests', () => {
         pair: 'BTC-USDT'
       }));
       
-      await waitForMessage(ws); // subscription
-      await waitForMessage(ws); // initial data
+      await subscriptionPromise;
 
-      const messages: any[] = [];
+      // Clear previous messages and set up for orderbook updates
+      messages.length = 0;
+      const updateMessages: any[] = [];
+      
       const messagePromise = new Promise<void>((resolve) => {
         let messageCount = 0;
         const expectedMessages = 5;
@@ -479,7 +571,7 @@ describe('WebSocket Service Tests', () => {
         ws.on('message', (data) => {
           const message = JSON.parse(data.toString());
           if (message.type === 'orderbook') {
-            messages.push(message);
+            updateMessages.push(message);
             messageCount++;
             if (messageCount >= expectedMessages) {
               resolve();
@@ -497,8 +589,8 @@ describe('WebSocket Service Tests', () => {
       // Wait for all messages
       await messagePromise;
 
-      expect(messages.length).toBe(5);
-      messages.forEach(message => {
+      expect(updateMessages.length).toBe(5);
+      updateMessages.forEach(message => {
         expect(message.type).toBe('orderbook');
         expect(message.data).toBeDefined();
       });
