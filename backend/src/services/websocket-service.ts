@@ -28,43 +28,43 @@ export class WebSocketService {
   }
 
   async register(fastify: FastifyInstance): Promise<void> {
-    fastify.register(require('@fastify/websocket'));
+    await fastify.register((await import('@fastify/websocket')).default);
 
     const self = this;
-    fastify.register(async function (fastify: any) {
-      fastify.get('/ws/market', { websocket: true }, (connection: any) => {
-        const clientId = self.generateClientId();
-        const client: WebSocketClient = {
-          id: clientId,
-          ws: connection.socket,
-          subscriptions: new Map(),
-          isAlive: true
-        };
 
-        self.clients.set(clientId, client);
+    fastify.get('/ws/market', { websocket: true } as any, (connection: any) => {
+      const socket = connection;
+      const clientId = self.generateClientId();
+      const client: WebSocketClient = {
+        id: clientId,
+        ws: socket,
+        subscriptions: new Map(),
+        isAlive: true
+      };
 
-        connection.socket.on('message', (message: Buffer) => {
-          self.handleMessage(client, message);
-        });
+      self.clients.set(clientId, client);
 
-        connection.socket.on('pong', () => {
-          client.isAlive = true;
-        });
+      socket.on('message', (message: Buffer) => {
+        self.handleMessage(client, message);
+      });
 
-        connection.socket.on('close', () => {
-          self.clients.delete(clientId);
-        });
+      socket.on('pong', () => {
+        client.isAlive = true;
+      });
 
-        connection.socket.on('error', (error: any) => {
-          console.error(`WebSocket error for client ${clientId}:`, error);
-          self.clients.delete(clientId);
-        });
+      socket.on('close', () => {
+        self.clients.delete(clientId);
+      });
 
-        self.sendMessage(client, {
-          type: 'connection',
-          message: 'Connected to FluxTrade WebSocket',
-          timestamp: Date.now()
-        });
+      socket.on('error', (error: any) => {
+        console.error(`WebSocket error for client ${clientId}:`, error);
+        self.clients.delete(clientId);
+      });
+
+      self.sendMessage(client, {
+        type: 'connection',
+        message: 'Connected to FluxTrade WebSocket',
+        timestamp: Date.now()
       });
     });
   }
@@ -187,7 +187,7 @@ export class WebSocketService {
   }
 
   private generateClientId(): string {
-    return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `client_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private startPingInterval(): void {
