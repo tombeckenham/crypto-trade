@@ -188,7 +188,7 @@ export class SimulationService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'FluxTrade-Simulation-Server'
+        'User-Agent': 'CryptoTrade-Simulation-Server'
       },
       body: JSON.stringify({
         pair: order.pair,

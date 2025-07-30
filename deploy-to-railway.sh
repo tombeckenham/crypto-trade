@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# FluxTrade Multi-Server Railway Deployment Script
+# CryptoTrade Multi-Server Railway Deployment Script
 set -e
 
-echo "🚀 FluxTrade Multi-Server Deployment to Railway"
+echo "🚀 CryptoTrade Multi-Server Deployment to Railway"
 echo "================================================"
 
 # Colors for output
@@ -39,7 +39,7 @@ pnpm build
 echo "   - Deploying to Railway..."
 if ! railway status &> /dev/null; then
     echo "   - Creating new backend service..."
-    railway service create fluxtrade-backend
+    railway service create cryptotrade-backend
 fi
 
 railway up
@@ -55,8 +55,8 @@ pnpm build
 
 # Create simulation service
 echo "   - Creating simulation service..."
-railway service create fluxtrade-simulation
-railway link fluxtrade-simulation
+railway service create cryptotrade-simulation
+railway link cryptotrade-simulation
 
 # Set environment variables for simulation server
 echo "   - Setting environment variables..."
@@ -86,8 +86,8 @@ cd ../frontend
 
 # Create frontend service
 echo "   - Creating frontend service..."
-railway service create fluxtrade-frontend
-railway link fluxtrade-frontend
+railway service create cryptotrade-frontend
+railway link cryptotrade-frontend
 
 # Set frontend environment variables
 echo "   - Setting environment variables..."

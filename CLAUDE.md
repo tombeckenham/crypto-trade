@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FluxTrade is a high-performance trading system demonstrating ultra-high volume order processing with sub-millisecond latency. The system uses a Fastify backend with TypeScript and a Vite + React + TypeScript frontend.
+CryptoTrade is a high-performance cryptocurrency trading system demonstrating ultra-high volume order processing with sub-millisecond latency. The system uses a Fastify backend with TypeScript and a Vite + React + TypeScript frontend.
 
 ## Architecture
 

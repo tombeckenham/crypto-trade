@@ -1,7 +1,7 @@
 {
-  "name": "fluxtrade-simulation-server",
+  "name": "crypto-trade-simulation-server",
   "version": "1.0.0",
-  "description": "High-volume trading simulation server",
+  "description": "High-volume crypto trading simulation server",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {

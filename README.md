@@ -1,1 +1,1 @@
-Ultra high speed trading system backend
+CryptoTrade - Ultra high speed cryptocurrency trading system

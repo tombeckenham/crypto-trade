@@ -97,7 +97,7 @@ export const TradingView: React.FC = () => {
 	return (
 		<div className="flex flex-col bg-background text-foreground dark">
 			<header className="flex items-center justify-between p-6 border-b">
-				<h1 className="text-2xl font-bold">FluxTrade</h1>
+				<h1 className="text-2xl font-bold">CryptoTrade</h1>
 
 				<div className="flex items-center gap-4">
 					<Select value={selectedPair} onValueChange={setSelectedPair}>

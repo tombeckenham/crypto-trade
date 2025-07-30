@@ -67,7 +67,7 @@ export class WebSocketService {
 
       self.sendMessage(client, {
         type: 'connection',
-        message: 'Connected to FluxTrade WebSocket',
+        message: 'Connected to CryptoTrade WebSocket',
         timestamp: Date.now()
       });
     });

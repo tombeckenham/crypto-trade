@@ -23,7 +23,7 @@ fastify.get('/health', async () => {
   const systemStats = simulationService.getSystemStats();
   return {
     status: 'ok',
-    service: 'fluxtrade-simulation-server',
+    service: 'cryptotrade-simulation-server',
     timestamp: Date.now(),
     ...systemStats
   };
@@ -64,7 +64,7 @@ fastify.post<{ Body: SimulationRequest }>('/api/simulate', async (request, reply
       ...result,
       timestamp: Date.now(),
       serverInfo: {
-        service: 'fluxtrade-simulation-server',
+        service: 'cryptotrade-simulation-server',
         maxCapacity: '200K orders/sec',
         ...simulationService.getSystemStats()
       }
@@ -116,7 +116,7 @@ fastify.get('/api/simulate/all', async () => {
 fastify.get('/api/stats', async () => {
   return {
     timestamp: Date.now(),
-    service: 'fluxtrade-simulation-server',
+    service: 'cryptotrade-simulation-server',
     ...simulationService.getSystemStats()
   };
 });
@@ -161,7 +161,7 @@ process.on('unhandledRejection', (reason, promise) => {
 const start = async () => {
   try {
     await fastify.listen({ port: PORT, host: HOST });
-    console.log(`🚀 FluxTrade Simulation Server listening on ${HOST}:${PORT}`);
+    console.log(`🚀 CryptoTrade Simulation Server listening on ${HOST}:${PORT}`);
     console.log(`💾 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
     console.log(`📊 Object pool pre-warmed with 5000 orders`);
   } catch (error) {

@@ -18,7 +18,7 @@ const wsService = new WebSocketService(matchingEngine);
 
 async function start() {
   try {
-    console.log('Starting FluxTrade backend...');
+    console.log('Starting CryptoTrade backend...');
     
     await server.register(cors, {
       origin: true,
@@ -38,7 +38,7 @@ async function start() {
     console.log(`Attempting to listen on ${host}:${port}...`);
     await server.listen({ port, host });
     
-    console.log(`✅ FluxTrade backend running on ${host}:${port}`);
+    console.log(`✅ CryptoTrade backend running on ${host}:${port}`);
     console.log(`WebSocket endpoint: ws://${host}:${port}/ws/market`);
     console.log(`REST API: http://${host}:${port}/api`);
     console.log(`Health check: http://${host}:${port}/api/health`);

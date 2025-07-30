@@ -95,7 +95,7 @@ describe('WebSocket Service Tests', () => {
 
       // Should receive connection confirmation
       expect(message.type).toBe('connection');
-      expect(message.message).toBe('Connected to FluxTrade WebSocket');
+      expect(message.message).toBe('Connected to CryptoTrade WebSocket');
       expect(message.timestamp).toBeTypeOf('number');
 
       ws.close();
