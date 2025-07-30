@@ -130,7 +130,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     });
   });
 
-  fastify.get('/health', async (_request, reply) => {
+  fastify.get('/api/health', async (_request, reply) => {
     return reply.send({
       status: 'ok',
       timestamp: Date.now()

@@ -24,7 +24,7 @@ describe('API Routes Integration Tests', () => {
     it('should return health status', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: '/health'
+        url: '/api/health'
       });
 
       expect(response.statusCode).toBe(200);
