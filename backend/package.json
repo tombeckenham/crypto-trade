@@ -19,6 +19,9 @@
 	"author": "",
 	"license": "ISC",
 	"packageManager": "pnpm@10.13.1",
+	"engines": {
+		"node": "22.x"
+	},
 	"devDependencies": {
 		"@faker-js/faker": "^9.9.0",
 		"@types/benchmark": "^2.1.5",
