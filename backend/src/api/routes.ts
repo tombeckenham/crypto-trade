@@ -173,7 +173,13 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
       return reply.code(500).send({ error: 'Failed to fetch market data' });
     }
 
-    const params = marketDataService.generateRealisticOrderParams(marketPrice);
+    let params;
+    try {
+      params = marketDataService.generateRealisticOrderParams(marketPrice);
+    } catch (error) {
+      console.error('Error generating order parameters:', error);
+      return reply.code(500).send({ error: 'Invalid market data received' });
+    }
     
     let orderCount = 0;
     let tradeCount = 0;

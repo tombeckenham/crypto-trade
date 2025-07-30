@@ -86,6 +86,7 @@ export class WebSocketService {
   private handleMessage(client: WebSocketClient, message: Buffer): void {
     try {
       const data: WebSocketMessage = JSON.parse(message.toString());
+      console.log(`Received message from client ${client.id}:`, data);
 
       switch (data.type) {
         case 'subscribe':
@@ -103,6 +104,7 @@ export class WebSocketService {
           break;
       }
     } catch (error) {
+      console.error(`Error handling message from client ${client.id}:`, error);
       this.sendMessage(client, {
         type: 'error',
         message: 'Invalid message format'
@@ -111,6 +113,8 @@ export class WebSocketService {
   }
 
   private subscribe(client: WebSocketClient, channel: string, pair: string): void {
+    console.log(`Client ${client.id} subscribing to ${channel}:${pair}`);
+    
     if (!client.subscriptions.has(channel)) {
       client.subscriptions.set(channel, new Set());
     }
@@ -125,6 +129,7 @@ export class WebSocketService {
 
     if (channel === 'orderbook') {
       const depth = this.matchingEngine.getMarketDepth(pair);
+      console.log(`Sending initial order book data for ${pair}:`, depth);
 
       this.sendMessage(client, {
         type: 'orderbook',

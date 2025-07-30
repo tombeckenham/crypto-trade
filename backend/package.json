@@ -3,6 +3,7 @@
 	"version": "1.0.0",
 	"description": "",
 	"main": "index.js",
+	"type": "module",
 	"scripts": {
 		"dev": "NODE_ENV=development tsx watch --clear-screen=false src/index.ts | pino-pretty",
 		"build": "tsc",

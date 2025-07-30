@@ -51,16 +51,26 @@ class MarketDataService {
 
       const ticker = await response.json() as BinanceTicker;
       
+      // Validate that we have valid numeric data
+      const price = parseFloat(ticker.price);
+      const bid = parseFloat(ticker.bidPrice);
+      const ask = parseFloat(ticker.askPrice);
+      
+      if (isNaN(price) || isNaN(bid) || isNaN(ask)) {
+        console.warn(`Invalid price data from Binance for ${binanceSymbol}, using fallback`);
+        return this.getFallbackPrice(pair);
+      }
+      
       const marketPrice: MarketPrice = {
         symbol: pair,
-        price: parseFloat(ticker.price),
-        bid: parseFloat(ticker.bidPrice),
-        ask: parseFloat(ticker.askPrice),
-        high24h: parseFloat(ticker.highPrice),
-        low24h: parseFloat(ticker.lowPrice),
-        volume24h: parseFloat(ticker.volume),
-        change24h: parseFloat(ticker.priceChange),
-        changePercent24h: parseFloat(ticker.priceChangePercent)
+        price,
+        bid,
+        ask,
+        high24h: parseFloat(ticker.highPrice) || price * 1.05,
+        low24h: parseFloat(ticker.lowPrice) || price * 0.95,
+        volume24h: parseFloat(ticker.volume) || 1000,
+        change24h: parseFloat(ticker.priceChange) || 0,
+        changePercent24h: parseFloat(ticker.priceChangePercent) || 0
       };
 
       // Cache the result
@@ -156,6 +166,17 @@ class MarketDataService {
     avgOrderSize: number;
     marketOrderRatio: number;
   } {
+    // Validate essential price data
+    if (isNaN(marketPrice.price) || marketPrice.price <= 0) {
+      throw new Error(`Invalid market price: ${marketPrice.price}`);
+    }
+    if (isNaN(marketPrice.bid) || isNaN(marketPrice.ask)) {
+      throw new Error(`Invalid bid/ask prices: bid=${marketPrice.bid}, ask=${marketPrice.ask}`);
+    }
+    if (isNaN(marketPrice.high24h) || isNaN(marketPrice.low24h)) {
+      throw new Error(`Invalid 24h high/low prices: high=${marketPrice.high24h}, low=${marketPrice.low24h}`);
+    }
+
     const price = marketPrice.price;
     const spread = Math.max(0.01, marketPrice.ask - marketPrice.bid);
     

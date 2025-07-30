@@ -44,7 +44,7 @@ export class WebSocketService {
         this.ws = new WebSocket(this.url);
 
         this.ws.onopen = () => {
-          console.log('WebSocket connected');
+          console.log('WebSocket connected to:', this.url);
           this.isConnecting = false;
           this.resubscribe();
           resolve();
@@ -97,6 +97,7 @@ export class WebSocketService {
 
   subscribe(channel: string, pair: string, handler: MessageHandler): void {
     const key = `${channel}:${pair}`;
+    console.log(`Subscribing to ${key}`);
     
     if (!this.handlers.has(key)) {
       this.handlers.set(key, new Set());
@@ -109,6 +110,7 @@ export class WebSocketService {
     this.subscriptions.get(channel)!.add(pair);
 
     if (this.ws?.readyState === WebSocket.OPEN) {
+      console.log(`Sending subscription message for ${channel}:${pair}`);
       this.send({
         type: 'subscribe',
         channel,
@@ -148,10 +150,13 @@ export class WebSocketService {
   private handleMessage(data: string): void {
     try {
       const message = JSON.parse(data);
+      console.log('WebSocket message received:', message);
       
       if (message.type === 'orderbook' || message.type === 'trade') {
         const key = `${message.type === 'orderbook' ? 'orderbook' : 'trades'}:${message.pair}`;
         const handlers = this.handlers.get(key);
+        
+        console.log(`Looking for handlers for key: ${key}, found ${handlers?.size || 0} handlers`);
         
         if (handlers) {
           handlers.forEach(handler => handler(message.data));
