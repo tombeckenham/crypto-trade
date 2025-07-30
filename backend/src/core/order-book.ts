@@ -100,11 +100,13 @@ export class OrderBook {
   }
 
   getBestBid(): OrderBookLevel | null {
-    const best = this.bids.findMax();
+    // For bids with descending comparator (b-a), findMin returns the highest actual price
+    const best = this.bids.findMin();
     return best ? best.value : null;
   }
 
   getBestAsk(): OrderBookLevel | null {
+    // For asks with ascending comparator (a-b), findMin returns the lowest actual price
     const best = this.asks.findMin();
     return best ? best.value : null;
   }
