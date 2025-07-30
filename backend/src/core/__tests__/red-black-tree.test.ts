@@ -165,17 +165,23 @@ describe('RedBlackTree', () => {
       const startTime = Date.now();
       const numItems = 10000;
 
-      // Insert items in random order
-      for (let i = 0; i < numItems; i++) {
-        const key = Math.floor(Math.random() * numItems * 2);
+      // Insert items in random order using unique keys
+      const keys = Array.from({length: numItems}, (_, i) => i);
+      // Shuffle the keys to randomize insertion order
+      for (let i = keys.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [keys[i], keys[j]] = [keys[j]!, keys[i]!];
+      }
+      
+      for (const key of keys) {
         tree.insert(key, `value_${key}`);
       }
 
       const insertTime = Date.now() - startTime;
       expect(insertTime).toBeLessThan(1000); // Should complete within 1 second
 
-      // Verify tree maintains correct size
-      expect(tree.getSize()).toBeGreaterThan(numItems * 0.8); // Allow for some duplicates
+      // Verify tree maintains correct size (should be exactly numItems with unique keys)
+      expect(tree.getSize()).toBe(numItems);
     });
 
     it('should maintain balance during mixed operations', () => {

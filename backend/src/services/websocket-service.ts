@@ -33,7 +33,7 @@ export class WebSocketService {
 
     const self = this;
 
-    fastify.get('/ws/market', { websocket: true }, (socket, req) => {
+    fastify.get('/ws/market', { websocket: true }, (socket, _req) => {
       const clientId = self.generateClientId();
       const client: WebSocketClient = {
         id: clientId,
@@ -121,6 +121,7 @@ export class WebSocketService {
 
     if (channel === 'orderbook') {
       const depth = this.matchingEngine.getMarketDepth(pair);
+
       this.sendMessage(client, {
         type: 'orderbook',
         pair,

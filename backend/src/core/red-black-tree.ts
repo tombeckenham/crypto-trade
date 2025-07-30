@@ -284,7 +284,10 @@ export class RedBlackTree<K, V> {
    * @param node - The node to rotate around
    */
   private rotateLeft(node: RBNode<K, V>): void {
-    const right = node.right!;  // Right child becomes new root
+    const right = node.right;
+    if (!right) {
+      return; // Cannot rotate left without right child
+    }
 
     // Move right's left subtree to node's right
     node.right = right.left;
@@ -314,7 +317,10 @@ export class RedBlackTree<K, V> {
    * @param node - The node to rotate around
    */
   private rotateRight(node: RBNode<K, V>): void {
-    const left = node.left!;  // Left child becomes new root
+    const left = node.left;
+    if (!left) {
+      return; // Cannot rotate right without left child
+    }
 
     // Move left's right subtree to node's left
     node.left = left.right;

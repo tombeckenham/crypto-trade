@@ -108,6 +108,7 @@ FluxTrade is a high-performance trading system demonstrating ultra-high volume o
 ## Package Management
 
 - Always use pnpm, and when adding modules use pnpm add instead of altering the package.json
+- Use pnpm for all package management tasks in the project
 
 ## Development Commands
 

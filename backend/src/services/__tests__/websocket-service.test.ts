@@ -274,38 +274,53 @@ describe('WebSocket Service Tests', () => {
     });
 
     it('should broadcast orderbook updates to subscribed clients', async () => {
-      // Both clients subscribe to orderbook
-      ws1.send(JSON.stringify({
-        type: 'subscribe',
-        channel: 'orderbook',
-        pair: 'BTC-USDT'
-      }));
-      
-      ws2.send(JSON.stringify({
-        type: 'subscribe',
-        channel: 'orderbook',
-        pair: 'BTC-USDT'
-      }));
+      // Create fresh WebSocket connections for this test
+      const { ws: testWs1 } = await connectAndWaitForConnectionMessage(serverPort);
+      const { ws: testWs2 } = await connectAndWaitForConnectionMessage(serverPort);
 
-      // Wait for subscriptions and initial data
-      await waitForMessage(ws1); // subscription
-      await waitForMessage(ws1); // initial orderbook
-      await waitForMessage(ws2); // subscription
-      await waitForMessage(ws2); // initial orderbook
+      try {
+        // Both clients subscribe to orderbook
+        testWs1.send(JSON.stringify({
+          type: 'subscribe',
+          channel: 'orderbook',
+          pair: 'BTC-USDT'
+        }));
+        
+        testWs2.send(JSON.stringify({
+          type: 'subscribe',
+          channel: 'orderbook',
+          pair: 'BTC-USDT'
+        }));
 
-      // Add an order which should trigger orderbook update
-      const order = createTestOrder('buy', 49000, 1.0);
-      matchingEngine.submitOrder(order);
+        // Wait for subscriptions and initial data
+        await waitForMessage(testWs1); // subscription
+        await waitForMessage(testWs1); // initial orderbook
+        await waitForMessage(testWs2); // subscription
+        await waitForMessage(testWs2); // initial orderbook
 
-      // Both clients should receive orderbook update
-      const message1 = await waitForMessage(ws1);
-      const message2 = await waitForMessage(ws2);
+        // Add a small delay to ensure clients are fully registered
+        await new Promise(resolve => setTimeout(resolve, 10));
 
-      [message1, message2].forEach(message => {
-        expect(message.type).toBe('orderbook');
-        expect(message.pair).toBe('BTC-USDT');
-        expect(message.data.bids.length).toBeGreaterThan(0);
-      });
+        // Add multiple orders to trigger orderbook updates
+        const order1 = createTestOrder('buy', 49000, 1.0);
+        const order2 = createTestOrder('buy', 48000, 1.0);
+        matchingEngine.submitOrder(order1);
+        matchingEngine.submitOrder(order2);
+
+        // Both clients should receive orderbook updates (we'll check the first one)
+        const message1 = await waitForMessage(testWs1);
+        const message2 = await waitForMessage(testWs2);
+
+        [message1, message2].forEach(message => {
+          expect(message.type).toBe('orderbook');
+          expect(message.pair).toBe('BTC-USDT');
+          expect(message.data.bids.length).toBeGreaterThan(0);
+        });
+      } finally {
+        // Clean up connections
+        if (testWs1.readyState === WebSocket.OPEN) testWs1.close();
+        if (testWs2.readyState === WebSocket.OPEN) testWs2.close();
+      }
     });
 
     it('should only send updates to clients subscribed to specific pairs', async () => {
@@ -402,7 +417,7 @@ describe('WebSocket Service Tests', () => {
         }
 
         // Subscribe all clients to orderbook
-        const subscriptionPromises = clients.map(async (ws, index) => {
+        const subscriptionPromises = clients.map(async (ws) => {
           ws.send(JSON.stringify({
             type: 'subscribe',
             channel: 'orderbook',
@@ -416,6 +431,9 @@ describe('WebSocket Service Tests', () => {
         // Wait for initial orderbook data
         const initialDataPromises = clients.map(ws => waitForMessage(ws));
         await Promise.all(initialDataPromises);
+
+        // Add a small delay to ensure clients are fully registered
+        await new Promise(resolve => setTimeout(resolve, 10));
 
         // Trigger an orderbook update
         const order = createTestOrder('buy', 49000, 1.0);
