@@ -10,6 +10,14 @@ import {
 import { useTradingStore } from "../store/trading-store";
 import { wsService } from "../services/websocket";
 import { type MarketDepth } from "../types/trading";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const TradingView: React.FC = () => {
 	const {
@@ -28,6 +36,7 @@ export const TradingView: React.FC = () => {
 
 	useEffect(() => {
 		// Prevent double connection in StrictMode
+		// TB Jul 30 2025 - don't love this... but it will do for now
 		if (isConnecting.current) return;
 		isConnecting.current = true;
 
@@ -73,66 +82,35 @@ export const TradingView: React.FC = () => {
 	const currentOrderBook = wsOrderBook || orderBook;
 
 	return (
-		<div
-			style={{
-				display: "flex",
-				flexDirection: "column",
-				height: "100vh",
-				background: "#0d0d0d",
-				color: "#e0e0e0",
-			}}
-		>
-			<header
-				style={{
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-					padding: "16px 24px",
-					borderBottom: "1px solid #333",
-				}}
-			>
-				<h1 style={{ margin: 0, fontSize: "24px" }}>FluxTrade</h1>
+		<div className="flex flex-col h-screen bg-background text-foreground dark">
+			<header className="flex items-center justify-between p-6 border-b">
+				<h1 className="text-2xl font-bold">FluxTrade</h1>
 
-				<div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-					<select
-						value={selectedPair}
-						onChange={(e) => setSelectedPair(e.target.value)}
-						style={{
-							padding: "8px 12px",
-							background: "#1a1a1a",
-							border: "1px solid #444",
-							borderRadius: "4px",
-							color: "#fff",
-						}}
-					>
-						{pairsData?.pairs.map((pair) => (
-							<option key={pair.symbol} value={pair.symbol}>
-								{pair.symbol}
-							</option>
-						))}
-					</select>
+				<div className="flex items-center gap-4">
+					<Select value={selectedPair} onValueChange={setSelectedPair}>
+						<SelectTrigger className="w-[180px]">
+							<SelectValue placeholder="Select trading pair" />
+						</SelectTrigger>
+						<SelectContent>
+							{pairsData?.pairs.map((pair) => (
+								<SelectItem key={pair.symbol} value={pair.symbol}>
+									{pair.symbol}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 
-					<div
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: "8px",
-						}}
-					>
+					<div className="flex items-center gap-2">
 						<div
-							style={{
-								width: "8px",
-								height: "8px",
-								borderRadius: "50%",
-								background:
-									connectionStatus === "connected"
-										? "#26a69a"
-										: connectionStatus === "connecting"
-										? "#ffa726"
-										: "#ef5350",
-							}}
+							className={`w-2 h-2 rounded-full ${
+								connectionStatus === "connected"
+									? "bg-green-500"
+									: connectionStatus === "connecting"
+									? "bg-yellow-500"
+									: "bg-red-500"
+							}`}
 						/>
-						<span style={{ fontSize: "14px" }}>
+						<span className="text-sm">
 							{connectionStatus === "connected"
 								? "Connected"
 								: connectionStatus === "connecting"
@@ -143,33 +121,16 @@ export const TradingView: React.FC = () => {
 				</div>
 			</header>
 
-			<main
-				style={{
-					flex: 1,
-					display: "flex",
-					padding: "24px",
-					gap: "24px",
-					minHeight: 0,
-				}}
-			>
-				<div
-					style={{
-						flex: 2,
-						display: "flex",
-						flexDirection: "column",
-						gap: "24px",
-					}}
-				>
-					<PriceChart trades={[]} pair={selectedPair} />
+			<main className="flex-1 flex p-6 gap-6 min-h-0">
+				<div className="flex-[2] flex flex-col gap-6 w-full">
+					<Card className="flex-1">
+						<CardContent className="p-6 h-full">
+							<PriceChart trades={[]} pair={selectedPair} />
+						</CardContent>
+					</Card>
 
-					<div
-						style={{
-							display: "flex",
-							gap: "24px",
-							flex: 1,
-						}}
-					>
-						<div style={{ flex: 1 }}>
+					<div className="flex gap-6 flex-1">
+						<div className="flex-1">
 							<TradeForm
 								pair={selectedPair}
 								userId={userId}
@@ -177,13 +138,17 @@ export const TradingView: React.FC = () => {
 							/>
 						</div>
 
-						<div style={{ flex: 1 }}>
+						<div className="flex-1">
 							{currentOrderBook && (
-								<OrderBook
-									bids={currentOrderBook.bids}
-									asks={currentOrderBook.asks}
-									pair={selectedPair}
-								/>
+								<Card>
+									<CardContent className="p-6">
+										<OrderBook
+											bids={currentOrderBook.bids}
+											asks={currentOrderBook.asks}
+											pair={selectedPair}
+										/>
+									</CardContent>
+								</Card>
 							)}
 						</div>
 					</div>

@@ -1,5 +1,8 @@
 import React, { useReducer } from "react";
 import { type PlaceOrderRequest } from "../services/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface TradeFormProps {
 	pair: string;
@@ -79,138 +82,85 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 	};
 
 	return (
-		<form
-			onSubmit={handleSubmit}
-			style={{
-				display: "flex",
-				flexDirection: "column",
-				gap: "16px",
-				padding: "16px",
-				background: "#1a1a1a",
-				borderRadius: "4px",
-				color: "#e0e0e0",
-			}}
-		>
-			<div style={{ display: "flex", gap: "8px" }}>
-				<button
-					type="button"
-					onClick={() => dispatch({ type: "SET_SIDE", side: "buy" })}
-					style={{
-						flex: 1,
-						padding: "8px",
-						border: "none",
-						borderRadius: "4px",
-						background: state.side === "buy" ? "#26a69a" : "#333",
-						color: "#fff",
-						cursor: "pointer",
-					}}
-				>
-					Buy
-				</button>
-				<button
-					type="button"
-					onClick={() => dispatch({ type: "SET_SIDE", side: "sell" })}
-					style={{
-						flex: 1,
-						padding: "8px",
-						border: "none",
-						borderRadius: "4px",
-						background: state.side === "sell" ? "#ef5350" : "#333",
-						color: "#fff",
-						cursor: "pointer",
-					}}
-				>
-					Sell
-				</button>
-			</div>
+		<Card>
+			<CardHeader>
+				<CardTitle>Place Order</CardTitle>
+			</CardHeader>
+			<CardContent>
+				<form onSubmit={handleSubmit} className="flex flex-col gap-4">
+					<div className="flex gap-2">
+						<Button
+							type="button"
+							variant={state.side === "buy" ? "buy" : "outline"}
+							className="flex-1"
+							onClick={() => dispatch({ type: "SET_SIDE", side: "buy" })}
+						>
+							Buy
+						</Button>
+						<Button
+							type="button"
+							variant={state.side === "sell" ? "sell" : "outline"}
+							className="flex-1"
+							onClick={() => dispatch({ type: "SET_SIDE", side: "sell" })}
+						>
+							Sell
+						</Button>
+					</div>
 
-			<div style={{ display: "flex", gap: "8px" }}>
-				<button
-					type="button"
-					onClick={() =>
-						dispatch({ type: "SET_ORDER_TYPE", orderType: "limit" })
-					}
-					style={{
-						flex: 1,
-						padding: "8px",
-						border: "1px solid #444",
-						borderRadius: "4px",
-						background: state.type === "limit" ? "#444" : "transparent",
-						color: "#fff",
-						cursor: "pointer",
-					}}
-				>
-					Limit
-				</button>
-				<button
-					type="button"
-					onClick={() =>
-						dispatch({ type: "SET_ORDER_TYPE", orderType: "market" })
-					}
-					style={{
-						flex: 1,
-						padding: "8px",
-						border: "1px solid #444",
-						borderRadius: "4px",
-						background: state.type === "market" ? "#444" : "transparent",
-						color: "#fff",
-						cursor: "pointer",
-					}}
-				>
-					Market
-				</button>
-			</div>
+					<div className="flex gap-2">
+						<Button
+							type="button"
+							variant={state.type === "limit" ? "secondary" : "outline"}
+							className="flex-1"
+							onClick={() =>
+								dispatch({ type: "SET_ORDER_TYPE", orderType: "limit" })
+							}
+						>
+							Limit
+						</Button>
+						<Button
+							type="button"
+							variant={state.type === "market" ? "secondary" : "outline"}
+							className="flex-1"
+							onClick={() =>
+								dispatch({ type: "SET_ORDER_TYPE", orderType: "market" })
+							}
+						>
+							Market
+						</Button>
+					</div>
 
-			{state.type === "limit" && (
-				<input
-					type="number"
-					step="0.01"
-					placeholder="Price"
-					value={state.price}
-					onChange={(e) =>
-						dispatch({ type: "SET_PRICE", price: e.target.value })
-					}
-					style={{
-						padding: "8px",
-						border: "1px solid #444",
-						borderRadius: "4px",
-						background: "#222",
-						color: "#fff",
-					}}
-				/>
-			)}
+					{state.type === "limit" && (
+						<Input
+							type="number"
+							step="0.01"
+							placeholder="Price"
+							value={state.price}
+							onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+								dispatch({ type: "SET_PRICE", price: e.target.value })
+							}
+						/>
+					)}
 
-			<input
-				type="number"
-				step="0.000001"
-				placeholder="Amount"
-				value={state.amount}
-				onChange={(e) =>
-					dispatch({ type: "SET_AMOUNT", amount: e.target.value })
-				}
-				style={{
-					padding: "8px",
-					border: "1px solid #444",
-					borderRadius: "4px",
-					background: "#222",
-					color: "#fff",
-				}}
-			/>
+					<Input
+						type="number"
+						step="0.000001"
+						placeholder="Amount"
+						value={state.amount}
+						onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+							dispatch({ type: "SET_AMOUNT", amount: e.target.value })
+						}
+					/>
 
-			<button
-				type="submit"
-				style={{
-					padding: "12px",
-					border: "none",
-					borderRadius: "4px",
-					background: state.side === "buy" ? "#26a69a" : "#ef5350",
-					color: "#fff",
-					fontWeight: "bold",
-					cursor: "pointer",
-				}}
-			>
-				{state.side === "buy" ? "Buy" : "Sell"} {pair.split("-")[0]}
-			</button>
-		</form>
+					<Button
+						type="submit"
+						variant={state.side === "buy" ? "buy" : "sell"}
+						size="lg"
+					>
+						{state.side === "buy" ? "Buy" : "Sell"} {pair.split("-")[0]}
+					</Button>
+				</form>
+			</CardContent>
+		</Card>
 	);
 };
