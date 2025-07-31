@@ -10,6 +10,7 @@ import {
 	SelectValue,
 } from "./ui/select";
 import { api, type PostApiSimulateResponse } from "../services/api";
+import { useBinanceCurrentPrice } from "@/hooks/use-trading-queries";
 
 interface SimulationControlsProps {
 	selectedPair: string;
@@ -24,6 +25,9 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 	lastSimulationId,
 	setLastSimulationId,
 }) => {
+	// Use the price from Binance to generate liquidity
+	const { data: currentPrice } = useBinanceCurrentPrice(selectedPair);
+
 	const [isSimulating, setIsSimulating] = useState(false);
 	const [ordersPerSecond, setOrdersPerSecond] = useState("1000");
 	const [duration, setDuration] = useState("10");
@@ -64,6 +68,17 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 		onSimulationStateChange?.(true);
 
 		try {
+			// Generate liquidity first.
+			// This will throw an error if the generation fails.
+			await api.generateLiquidity({
+				pair: selectedPair,
+				basePrice: currentPrice?.toString() || "10000",
+				orderCount: 100,
+				spread: "0.001",
+				maxDepth: "0.001",
+			});
+
+			// Now run the simulation
 			const response = await api.startSimulation(
 				parseInt(ordersPerSecond),
 				parseInt(duration),
