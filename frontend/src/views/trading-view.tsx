@@ -89,12 +89,12 @@ export const TradingView: React.FC = () => {
 
 	return (
 		<div className="flex flex-col bg-background text-foreground dark">
-			<header className="flex items-center justify-between p-6 border-b">
-				<h1 className="text-2xl font-bold">CryptoTrade</h1>
+			<header className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:p-6 border-b gap-4 sm:gap-0">
+				<h1 className="text-xl md:text-2xl font-bold">CryptoTrade</h1>
 
-				<div className="flex items-center gap-4">
+				<div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
 					<Select value={selectedPair} onValueChange={setSelectedPair}>
-						<SelectTrigger className="w-[180px]">
+						<SelectTrigger className="w-full sm:w-[180px]">
 							<SelectValue placeholder="Select trading pair" />
 						</SelectTrigger>
 						<SelectContent>
@@ -127,16 +127,31 @@ export const TradingView: React.FC = () => {
 				</div>
 			</header>
 
-			<main className="flex-1 flex p-6 gap-6 min-h-0">
-				<div className="flex-[2] flex flex-col gap-6 w-full">
+			<main className="flex-1 flex flex-col md:flex-row p-4 md:p-6 gap-4 md:gap-6 min-h-0">
+				<div className="flex-[2] flex flex-col gap-4 md:gap-6 w-full">
 					<Card className="flex-1">
-						<CardContent className="p-6 h-full">
+						<CardContent className="p-4 md:p-6 h-full">
 							<PriceChart trades={[]} pair={selectedPair} />
 						</CardContent>
 					</Card>
 
-					<div className="flex gap-6 flex-1">
-						<div className="flex-1 space-y-6">
+					{/* Order book on mobile - between chart and trading controls */}
+					{currentOrderBook && (
+						<Card className="md:hidden">
+							<CardContent className="p-4">
+								<OrderBook
+									bids={currentOrderBook.bids}
+									asks={currentOrderBook.asks}
+									pair={selectedPair}
+								/>
+							</CardContent>
+						</Card>
+					)}
+
+					<div className="flex flex-col md:flex-row gap-4 md:gap-6 flex-1">
+						<div className="flex-1 max-w-lg space-y-4 md:space-y-6">
+							<LiquidityGenerator pair={selectedPair} />
+
 							<TradeForm
 								pair={selectedPair}
 								userId={userId}
@@ -149,14 +164,13 @@ export const TradingView: React.FC = () => {
 								lastSimulationId={lastSimulationId}
 								setLastSimulationId={setLastSimulationId}
 							/>
-
-							<LiquidityGenerator pair={selectedPair} />
 						</div>
 
-						<div className="flex-1 space-y-6">
+						<div className="flex-1 space-y-4 md:space-y-6">
+							{/* Order book on desktop - in right column */}
 							{currentOrderBook && (
-								<Card>
-									<CardContent className="p-6">
+								<Card className="hidden md:block">
+									<CardContent className="p-4 md:p-6">
 										<OrderBook
 											bids={currentOrderBook.bids}
 											asks={currentOrderBook.asks}
