@@ -6,7 +6,7 @@ import { simulationService } from './simulation-service.js';
 import { SimulationRequest } from './types.js';
 
 const PORT = parseInt(process.env.PORT || '3002');
-const HOST = process.env.HOST || 'localhost';
+const HOST = process.env.HOST || '0.0.0.0';
 
 const fastify = Fastify({
   logger: {
