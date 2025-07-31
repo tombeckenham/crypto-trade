@@ -4,6 +4,7 @@ import { TradeForm } from "../components/trade-form";
 import { PriceChart } from "../components/price-chart";
 import { SimulationControls } from "../components/simulation-controls";
 import { VolumeMetrics } from "../components/volume-metrics";
+import { LiquidityGenerator } from "../components/liquidity-generator";
 import {
 	useOrderBook,
 	usePlaceOrder,
@@ -146,6 +147,8 @@ export const TradingView: React.FC = () => {
 								selectedPair={selectedPair}
 								onSimulationStateChange={setIsSimulating}
 							/>
+
+							<LiquidityGenerator pair={selectedPair} />
 						</div>
 
 						<div className="flex-1 space-y-6">

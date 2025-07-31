@@ -369,8 +369,8 @@ describe('WebSocket Service Tests', () => {
         const updatePromise2 = waitForMessage(testWs2);
 
         // Add multiple orders to trigger orderbook updates
-        const order1 = createTestOrder('buy', 49000, 1.0);
-        const order2 = createTestOrder('buy', 48000, 1.0);
+        const order1 = createTestOrder('buy', "49000", "1.0");
+        const order2 = createTestOrder('buy', "48000", "1.0");
         matchingEngine.submitOrder(order1);
         matchingEngine.submitOrder(order2);
 
@@ -408,8 +408,8 @@ describe('WebSocket Service Tests', () => {
       await waitForMessage(ws2); // subscription confirmation
 
       // Create trade for BTC-USDT
-      const sellOrder = createTestOrder('sell', 50000, 1.0, 'BTC-USDT');
-      const buyOrder = createTestOrder('buy', 50000, 1.0, 'BTC-USDT');
+      const sellOrder = createTestOrder('sell', "50000", "1.0", 'BTC-USDT');
+      const buyOrder = createTestOrder('buy', "50000", "1.0", 'BTC-USDT');
 
       matchingEngine.submitOrder(sellOrder);
       matchingEngine.submitOrder(buyOrder);
@@ -462,8 +462,8 @@ describe('WebSocket Service Tests', () => {
 
       // Creating a trade should not throw even though client disconnected
       expect(() => {
-        const sellOrder = createTestOrder('sell', 50000, 1.0);
-        const buyOrder = createTestOrder('buy', 50000, 1.0);
+        const sellOrder = createTestOrder('sell', "50000", "1.0");
+        const buyOrder = createTestOrder('buy', "50000", "1.0");
         matchingEngine.submitOrder(sellOrder);
         matchingEngine.submitOrder(buyOrder);
       }).not.toThrow();
@@ -515,7 +515,7 @@ describe('WebSocket Service Tests', () => {
         const updatePromises = clients.map(ws => waitForMessage(ws));
 
         // Trigger an orderbook update
-        const order = createTestOrder('buy', 49000, 1.0);
+        const order = createTestOrder('buy', "49000", "1.0");
         matchingEngine.submitOrder(order);
 
         // All clients should receive the update
@@ -599,7 +599,7 @@ describe('WebSocket Service Tests', () => {
 
       // Submit multiple rapid orders
       for (let i = 0; i < 5; i++) {
-        const order = createTestOrder('buy', 49000 - i * 100, 1.0);
+        const order = createTestOrder('buy', (49000 - i * 100).toString(), "1.0");
         matchingEngine.submitOrder(order);
       }
 

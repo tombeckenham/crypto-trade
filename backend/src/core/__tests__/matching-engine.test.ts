@@ -235,7 +235,7 @@ describe('MatchingEngine', () => {
       // Second trade at next level (50200 for remaining 0.2)
       const trade2 = tradeSpy.mock.calls[1]![0] as CryptoTrade;
       expect(trade2.price).toBe("50200");
-      expect(trade2.amount).toBeCloseTo("0.2", 10);
+      expect(parseFloat(trade2.amount)).toBeCloseTo(0.2, 10);
       expect(trade2.takerSide).toBe('buy');
     });
 

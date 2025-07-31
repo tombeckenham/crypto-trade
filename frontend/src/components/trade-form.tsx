@@ -62,17 +62,16 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
 
-		const amountNum = parseFloat(state.amount);
-		const priceNum = state.type === "limit" ? parseFloat(state.price) : 0;
-
-		if (!state.amount || isNaN(amountNum) || amountNum <= 0) {
+		// Validate amount as string without converting to number to preserve precision
+		if (!state.amount || !/^\d*\.?\d+$/.test(state.amount) || parseFloat(state.amount) <= 0) {
 			alert("Please enter a valid amount");
 			return;
 		}
 
+		// Validate price as string for limit orders
 		if (
 			state.type === "limit" &&
-			(!state.price || isNaN(priceNum) || priceNum <= 0)
+			(!state.price || !/^\d*\.?\d+$/.test(state.price) || parseFloat(state.price) <= 0)
 		) {
 			alert("Please enter a valid price");
 			return;

@@ -168,11 +168,11 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 							<div className="grid grid-cols-2 gap-2">
 								<div>
 									<span className="text-gray-400">Price:</span> $
-									{marketData.currentPrice?.toFixed(2)}
+									{marketData.currentPrice ? parseFloat(marketData.currentPrice).toLocaleString() : 'N/A'}
 								</div>
 								<div>
 									<span className="text-gray-400">Spread:</span> $
-									{marketData.spread?.toFixed(4)}
+									{marketData.spread ? parseFloat(marketData.spread).toFixed(4) : 'N/A'}
 								</div>
 								<div>
 									<span className="text-gray-400">Volatility:</span>{" "}

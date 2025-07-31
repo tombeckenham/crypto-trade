@@ -724,4 +724,176 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
       )
     });
   });
+
+  fastify.post('/api/generate-liquidity', {
+    preHandler: validateApiKey,
+    config: { rateLimit: authenticatedRateLimit },
+    schema: {
+      tags: ['Simulation'],
+      summary: 'Generate market liquidity',
+      description: 'Create realistic limit orders to simulate market liquidity (requires API key)',
+      security: [{ apiKey: [] }],
+      body: {
+        type: 'object',
+        required: ['pair', 'basePrice'],
+        properties: {
+          pair: { type: 'string', description: 'Trading pair symbol' },
+          basePrice: { type: 'string', description: 'Base price around which to generate orders' },
+          orderCount: { type: 'integer', minimum: 10, maximum: 1000, default: 100, description: 'Number of orders to generate' },
+          spread: { type: 'string', default: '0.01', description: 'Spread percentage (0.01 = 1%)' },
+          maxDepth: { type: 'string', default: '0.05', description: 'Maximum price depth percentage (0.05 = 5%)' }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', description: 'Success message' },
+            ordersGenerated: { type: 'number', description: 'Number of orders created' },
+            pair: { type: 'string', description: 'Trading pair' },
+            basePrice: { type: 'string', description: 'Base price used' },
+            priceRange: {
+              type: 'object',
+              properties: {
+                minBid: { type: 'string', description: 'Lowest bid price' },
+                maxAsk: { type: 'string', description: 'Highest ask price' }
+              }
+            }
+          }
+        },
+        400: errorSchema,
+        500: errorSchema
+      }
+    }
+  }, async (request, reply) => {
+    const { 
+      pair, 
+      basePrice, 
+      orderCount = 100, 
+      spread = '0.01', 
+      maxDepth = '0.05' 
+    } = request.body as {
+      pair: string;
+      basePrice: string;
+      orderCount?: number;
+      spread?: string;
+      maxDepth?: string;
+    };
+
+    try {
+      const basePriceNum = parseFloat(basePrice);
+      const spreadNum = parseFloat(spread);
+      const maxDepthNum = parseFloat(maxDepth);
+
+      if (basePriceNum <= 0 || spreadNum <= 0 || maxDepthNum <= 0) {
+        return reply.code(400).send({ error: 'Invalid price parameters' });
+      }
+
+      const ordersPerSide = Math.floor(orderCount / 2);
+      let ordersCreated = 0;
+      const userPrefix = 'liquidity-bot';
+
+      // Calculate price ranges
+      const halfSpread = basePriceNum * spreadNum / 2;
+      const bidBase = basePriceNum - halfSpread;
+      const askBase = basePriceNum + halfSpread;
+      const depthRange = basePriceNum * maxDepthNum;
+
+      let minBid = bidBase;
+      let maxAsk = askBase;
+
+      // Generate buy orders (bids) below base price
+      for (let i = 0; i < ordersPerSide; i++) {
+        const depthFactor = Math.pow(Math.random(), 0.5); // Bias towards better prices
+        const priceOffset = depthRange * depthFactor;
+        const orderPrice = bidBase - priceOffset;
+        
+        if (orderPrice <= 0) continue;
+
+        // Vary order sizes - more small orders, fewer large ones
+        const sizeRandom = Math.random();
+        let orderSize: number;
+        if (sizeRandom < 0.6) {
+          // Small orders (60%)
+          orderSize = 0.01 + Math.random() * 0.1;
+        } else if (sizeRandom < 0.9) {
+          // Medium orders (30%)
+          orderSize = 0.1 + Math.random() * 0.5;
+        } else {
+          // Large orders (10%)
+          orderSize = 0.5 + Math.random() * 2;
+        }
+
+        const order: CryptoOrder = {
+          id: nanoid(),
+          pair,
+          side: 'buy',
+          type: 'limit',
+          price: orderPrice.toFixed(8),
+          amount: orderSize.toFixed(8),
+          timestamp: Date.now(),
+          userId: `${userPrefix}-${Math.floor(Math.random() * 1000)}`,
+          status: 'pending',
+          filledAmount: '0'
+        };
+
+        matchingEngine.submitOrder(order);
+        ordersCreated++;
+        minBid = Math.min(minBid, orderPrice);
+      }
+
+      // Generate sell orders (asks) above base price
+      for (let i = 0; i < ordersPerSide; i++) {
+        const depthFactor = Math.pow(Math.random(), 0.5); // Bias towards better prices
+        const priceOffset = depthRange * depthFactor;
+        const orderPrice = askBase + priceOffset;
+
+        // Vary order sizes
+        const sizeRandom = Math.random();
+        let orderSize: number;
+        if (sizeRandom < 0.6) {
+          // Small orders (60%)
+          orderSize = 0.01 + Math.random() * 0.1;
+        } else if (sizeRandom < 0.9) {
+          // Medium orders (30%)
+          orderSize = 0.1 + Math.random() * 0.5;
+        } else {
+          // Large orders (10%)
+          orderSize = 0.5 + Math.random() * 2;
+        }
+
+        const order: CryptoOrder = {
+          id: nanoid(),
+          pair,
+          side: 'sell',
+          type: 'limit',
+          price: orderPrice.toFixed(8),
+          amount: orderSize.toFixed(8),
+          timestamp: Date.now(),
+          userId: `${userPrefix}-${Math.floor(Math.random() * 1000)}`,
+          status: 'pending',
+          filledAmount: '0'
+        };
+
+        matchingEngine.submitOrder(order);
+        ordersCreated++;
+        maxAsk = Math.max(maxAsk, orderPrice);
+      }
+
+      return reply.send({
+        message: `Generated ${ordersCreated} limit orders for ${pair}`,
+        ordersGenerated: ordersCreated,
+        pair,
+        basePrice,
+        priceRange: {
+          minBid: minBid.toFixed(8),
+          maxAsk: maxAsk.toFixed(8)
+        }
+      });
+
+    } catch (error) {
+      console.error('Error generating liquidity:', error);
+      return reply.code(500).send({ error: 'Failed to generate liquidity' });
+    }
+  });
 }

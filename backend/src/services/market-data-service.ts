@@ -1,6 +1,6 @@
 interface BinanceTicker {
   symbol: string;
-  price: string;
+  lastPrice: string;
   bidPrice: string;
   askPrice: string;
   highPrice: string;
@@ -52,7 +52,7 @@ class MarketDataService {
       const ticker = await response.json() as BinanceTicker;
       
       // Validate that we have valid numeric data
-      const price = parseFloat(ticker.price);
+      const price = parseFloat(ticker.lastPrice);
       const bid = parseFloat(ticker.bidPrice);
       const ask = parseFloat(ticker.askPrice);
       

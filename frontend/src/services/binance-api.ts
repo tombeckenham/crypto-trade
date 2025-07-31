@@ -31,7 +31,7 @@ class BinanceAPIService {
   ): Promise<CandlestickData[]> {
     const url = `${this.baseUrl}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
     console.log('Fetching from Binance:', url)
-    
+
     try {
       const response = await fetch(url)
 
@@ -49,15 +49,56 @@ class BinanceAPIService {
         high: parseFloat(kline[2]),
         low: parseFloat(kline[3]),
         close: parseFloat(kline[4]),
-      })).filter(candle => 
-        !isNaN(candle.time) && 
-        !isNaN(candle.open) && 
-        !isNaN(candle.high) && 
-        !isNaN(candle.low) && 
+      })).filter(candle =>
+        !isNaN(candle.time) &&
+        !isNaN(candle.open) &&
+        !isNaN(candle.high) &&
+        !isNaN(candle.low) &&
         !isNaN(candle.close)
       )
     } catch (error) {
       console.error('Failed to fetch Binance data:', error)
+      throw error
+    }
+  }
+
+  async getCurrentPrice(symbol: string): Promise<number> {
+    const url = `${this.baseUrl}/ticker/24hr?symbol=${symbol}`
+    console.log('Fetching current price from Binance:', url)
+
+    try {
+      const response = await fetch(url)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Binance 24hr ticker API error:', response.status, errorText)
+        throw new Error(`Binance 24hr ticker API error: ${response.status} - ${errorText}`)
+      }
+
+      const data = await response.json() as {
+        symbol: string;
+        lastPrice: string;
+        bidPrice: string;
+        askPrice: string;
+        highPrice: string;
+        lowPrice: string;
+        volume: string;
+        priceChange: string;
+        priceChangePercent: string;
+      }
+
+      const price = parseFloat(data.lastPrice)
+      const bid = parseFloat(data.bidPrice)
+      const ask = parseFloat(data.askPrice)
+
+      // Validate that we have valid numeric data
+      if (isNaN(price) || isNaN(bid) || isNaN(ask) || price <= 0) {
+        throw new Error('Invalid price data received from Binance API')
+      }
+
+      return price
+    } catch (error) {
+      console.error('Failed to fetch current price:', error)
       throw error
     }
   }

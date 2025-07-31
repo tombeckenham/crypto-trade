@@ -35,11 +35,11 @@ export type PostApiSimulateResponses = {
       /**
        * Current market price
        */
-      currentPrice?: number;
+      currentPrice?: string;
       /**
        * Bid-ask spread
        */
-      spread?: number;
+      spread?: string;
       /**
        * Market volatility percentage
        */
@@ -47,7 +47,7 @@ export type PostApiSimulateResponses = {
       /**
        * Average order size
        */
-      avgOrderSize?: number;
+      avgOrderSize?: string;
       /**
        * Market order ratio percentage
        */
@@ -132,6 +132,33 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ordersPerSecond, durationSeconds, pair })
+    });
+    return handleResponse(response);
+  },
+
+  async generateLiquidity(params: {
+    pair: string;
+    basePrice: string;
+    orderCount?: number;
+    spread?: string;
+    maxDepth?: string;
+  }): Promise<{
+    message: string;
+    ordersGenerated: number;
+    pair: string;
+    basePrice: string;
+    priceRange: {
+      minBid: string;
+      maxAsk: string;
+    };
+  }> {
+    const response = await fetch(`${API_BASE_URL}/generate-liquidity`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': API_KEY
+      },
+      body: JSON.stringify(params)
     });
     return handleResponse(response);
   }
