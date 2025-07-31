@@ -27,7 +27,38 @@ interface TradesParams {
   pair: string;
 }
 
+// API Key authentication hook
+const validateApiKey = async (request: any, reply: any) => {
+  const apiKey = request.headers['x-api-key'];
+  const validApiKeys = [
+    process.env['SIMULATION_API_KEY'],
+    process.env['FRONTEND_API_KEY']
+  ].filter(Boolean);
+
+  if (!apiKey || !validApiKeys.includes(apiKey)) {
+    reply.code(401).send({ error: 'Invalid or missing API key' });
+  }
+};
+
 export function registerRoutes(fastify: FastifyInstance, matchingEngine: MatchingEngine): void {
+  // Rate limiting configurations
+  const publicRateLimit = {
+    max: 100,
+    timeWindow: '1 minute'
+  };
+  
+  const authenticatedRateLimit = {
+    max: 1000,
+    timeWindow: '1 minute',
+    keyGenerator: (request: any) => {
+      const apiKey = request.headers['x-api-key'];
+      // Give simulation server unlimited requests by using a unique key space
+      if (apiKey === process.env['SIMULATION_API_KEY']) {
+        return `unlimited:${apiKey}:${Math.floor(Date.now() / 60000)}`; // New key every minute = unlimited
+      }
+      return request.ip;
+    }
+  };
   // Schema definitions for OpenAPI
   const orderSchema = {
     type: 'object',
@@ -73,10 +104,13 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
   };
 
   fastify.post<{ Body: PlaceOrderBody }>('/api/orders', {
+    preHandler: validateApiKey,
+    config: { rateLimit: authenticatedRateLimit },
     schema: {
       tags: ['Orders'],
       summary: 'Place a new order',
-      description: 'Submit a new buy or sell order to the matching engine',
+      description: 'Submit a new buy or sell order to the matching engine (requires API key)',
+      security: [{ apiKey: [] }],
       body: {
         type: 'object',
         required: ['pair', 'side', 'type', 'amount', 'userId'],
@@ -176,6 +210,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
   });
 
   fastify.get<{ Params: OrderBookParams }>('/api/orderbook/:pair', {
+    config: { rateLimit: publicRateLimit },
     schema: {
       tags: ['Market Data'],
       summary: 'Get order book',

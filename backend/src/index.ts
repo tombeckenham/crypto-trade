@@ -1,5 +1,6 @@
 import fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { MatchingEngine } from './core/matching-engine.js';
@@ -21,12 +22,24 @@ const wsService = new WebSocketService(matchingEngine);
 async function start() {
   try {
     console.log('Starting CryptoTrade backend...');
-    
+
     await server.register(cors, {
-      origin: true,
+      origin: [
+        'http://localhost:5173', // Local development
+        'https://cryptotrade-frontend-production.up.railway.app', // Production frontend
+        /^https:\/\/cryptotrade-frontend-.*\.up\.railway\.app$/ // Railway preview deployments
+      ],
       credentials: true
     });
     console.log('CORS registered');
+
+    // Global rate limiting for public endpoints
+    await server.register(rateLimit, {
+      global: false, // Don't apply globally, we'll apply per route
+      max: 100, // Conservative limit for public endpoints
+      timeWindow: '1 minute'
+    });
+    console.log('Rate limiting registered');
 
     await server.register(swagger, {
       openapi: {
@@ -59,6 +72,13 @@ async function start() {
           { name: 'WebSocket', description: 'Real-time WebSocket connections' }
         ],
         components: {
+          securitySchemes: {
+            apiKey: {
+              type: 'apiKey',
+              in: 'header',
+              name: 'X-API-Key'
+            }
+          },
           schemas: {
             Error: {
               type: 'object',
@@ -184,16 +204,16 @@ async function start() {
 
     await wsService.register(server);
     console.log('WebSocket service registered');
-    
+
     registerRoutes(server, matchingEngine);
     console.log('Routes registered');
 
     const port = parseInt(process.env['PORT'] || '3001');
     const host = process.env['HOST'] || '0.0.0.0';
-    
+
     console.log(`Attempting to listen on ${host}:${port}...`);
     await server.listen({ port, host });
-    
+
     console.log(`✅ CryptoTrade backend running on ${host}:${port}`);
     console.log(`WebSocket endpoint: ws://${host}:${port}/ws/market`);
     console.log(`REST API: http://${host}:${port}/api`);

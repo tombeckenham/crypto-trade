@@ -188,7 +188,8 @@ export class SimulationService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'CryptoTrade-Simulation-Server'
+        'User-Agent': 'CryptoTrade-Simulation-Server',
+        'X-API-Key': process.env.SIMULATION_API_KEY || 'sim-server-key'
       },
       body: JSON.stringify({
         pair: order.pair,
