@@ -1,4 +1,4 @@
-# CryptoTrade - Ultra-High Performance Cryptocurrency Trading System
+# CryptoTrade - High Performance Cryptocurrency Trading System
 
 CryptoTrade is a demonstration of a high-performance cryptocurrency trading system demonstrating ultra-high volume order processing with sub-millisecond latency. Built with TypeScript, it showcases advanced algorithmic trading concepts, real-time market data streaming, and optimized data structures for financial applications.
 
