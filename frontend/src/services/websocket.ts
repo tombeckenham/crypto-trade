@@ -1,4 +1,4 @@
-import { type MarketDepth } from "@shared/types/trading.js";
+import { type MarketDepth } from "../types/trading.js";
 
 type MessageHandler = (data: MarketDepth) => void;
 

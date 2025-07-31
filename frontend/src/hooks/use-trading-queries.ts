@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type PlaceOrderRequest } from '../services/api';
 import { binanceAPI } from '../services/binance-api';
-import type { MarketDepth, TradingPair } from '@shared/types/trading.js';
+import type { MarketDepth, TradingPair } from '../types/trading.js';
 import type { Time } from 'lightweight-charts';
 
 export const useOrderBook = (pair: string, levels: number = 20) => {

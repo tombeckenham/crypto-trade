@@ -3,7 +3,7 @@ import { faker } from '@faker-js/faker';
 import { OrderBook } from '../order-book.js';
 import { MatchingEngine } from '../matching-engine.js';
 import { RedBlackTree } from '../red-black-tree.js';
-import { CryptoOrder, OrderSide } from '@shared/types/trading.js';
+import { CryptoOrder, OrderSide } from '../../types/trading.js';
 import { numberToString } from '../../utils/precision.js';
 
 describe('Performance Tests', () => {

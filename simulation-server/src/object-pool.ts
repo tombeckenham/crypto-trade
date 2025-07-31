@@ -11,7 +11,7 @@
  * - Lower CPU usage from object creation/destruction
  */
 
-import { CryptoOrder } from '@shared/types/trading';
+import { CryptoOrder } from './trading.js';
 import { nanoid } from 'nanoid';
 
 /**

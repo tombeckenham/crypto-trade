@@ -20,7 +20,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import type { MarketDepth } from "@shared/types/trading";
+import type { MarketDepth } from "../types/trading";
 
 export const TradingView: React.FC = () => {
 	const {

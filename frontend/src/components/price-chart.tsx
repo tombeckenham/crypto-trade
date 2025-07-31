@@ -7,7 +7,7 @@ import {
 	CandlestickSeries,
 	type TimeScaleOptions,
 } from "lightweight-charts";
-import { type CryptoTrade } from "@shared/types/trading.js";
+import { type CryptoTrade } from "../types/trading.js";
 import { useBinanceKlines } from "../hooks/use-trading-queries";
 
 interface PriceChartProps {

@@ -3,7 +3,7 @@
  * Reuses order objects instead of creating/destroying millions of them
  */
 
-import { CryptoOrder } from '@shared/types/trading.js';
+import { CryptoOrder } from '../types/trading.js';
 import { nanoid } from 'nanoid';
 
 export class ObjectPool<T> {

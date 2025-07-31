@@ -1,10 +1,10 @@
 import { EventEmitter } from 'events';
 import { OrderBook } from './order-book.js';
-import { CryptoOrder, CryptoTrade } from '@shared/types/trading.js';
+import { CryptoOrder, CryptoTrade } from '../types/trading.js';
 import { nanoid } from 'nanoid';
 import { orderPool } from '../utils/object-pool.js';
 import { addStrings, multiplyStrings, numberToString } from '../utils/precision.js';
-import { OrderBookStats } from '@shared/types/trading.js';
+import { OrderBookStats } from '../types/trading.js';
 import { FastifyBaseLogger } from 'fastify';
 
 /**

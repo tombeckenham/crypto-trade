@@ -23,10 +23,7 @@
 		"lib": ["es2022", "dom"],
 		"skipLibCheck": true,
 		"isolatedModules": true,
-		"resolveJsonModule": true,
-		"paths": {
-			"@shared/*": ["../shared/*"]
-		}
+		"resolveJsonModule": true
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "dist"]

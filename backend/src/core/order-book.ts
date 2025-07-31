@@ -1,5 +1,5 @@
 import { RedBlackTree } from './red-black-tree.js';
-import { CryptoOrder, OrderBookLevel, MarketDepth, OrderSide } from '@shared/types/trading.js';
+import { CryptoOrder, OrderBookLevel, MarketDepth, OrderSide } from '../types/trading.js';
 import { addStrings, subtractStrings, numberToString } from '../utils/precision.js';
 
 /**

@@ -4,7 +4,7 @@ import fastify, { FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
 import { MatchingEngine } from '../../core/matching-engine.js';
 import { WebSocketService } from '../websocket-service.js';
-import { CryptoOrder } from '@shared/types/trading.js';
+import { CryptoOrder } from '../../types/trading.js';
 
 describe('WebSocket Service Tests', () => {
   let app: FastifyInstance;

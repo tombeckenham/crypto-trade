@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "./ui/card";
 import { api } from "../services/api";
-import type { OrderBookStats } from "@shared/types/trading";
+import type { OrderBookStats } from "../types/trading";
 
 interface VolumeMetricsProps {
 	pair: string;

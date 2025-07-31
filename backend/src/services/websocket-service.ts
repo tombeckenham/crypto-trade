@@ -1,7 +1,7 @@
 import { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
 import { MatchingEngine } from '../core/matching-engine.js';
-import { CryptoOrder, CryptoTrade } from '@shared/types/trading.js';
+import { CryptoOrder, CryptoTrade } from '../types/trading.js';
 import { getErrorMessage } from '../utils/error-utils.js';
 
 interface WebSocketMessage {

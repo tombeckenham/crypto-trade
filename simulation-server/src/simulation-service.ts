@@ -9,12 +9,12 @@
  * - Resource management and cleanup
  */
 
-import { SimulationRequest, SimulationStatus, MarketPrice } from './types';
-import { CryptoOrder, MarketDepth } from '@shared/types/trading';
-import { marketDataService } from './market-data';
-import { createPooledOrder, releaseOrder, orderPool } from './object-pool';
+import { SimulationRequest, SimulationStatus, MarketPrice } from './types.js';
+import { CryptoOrder, MarketDepth } from './trading.js';
+import { marketDataService } from './market-data.js';
+import { createPooledOrder, releaseOrder, orderPool } from './object-pool.js';
 import { nanoid } from 'nanoid';
-import { SimulationLogger } from './simulation-logger';
+import { SimulationLogger } from './simulation-logger.js';
 
 /**
  * Main simulation service class that handles all simulation operations
@@ -264,8 +264,8 @@ export class SimulationService {
           } else {
             params.marketOrderRatio = Math.max(0.1, Math.min(0.25, params.volatility * 20));
             // Calculate total volume on each side of the order book
-            const bidVolume = orderBook.bids.reduce((sum, level) => sum + parseFloat(level.amount), 0);
-            const askVolume = orderBook.asks.reduce((sum, level) => sum + parseFloat(level.amount), 0);
+            const bidVolume = orderBook.bids.reduce((sum: number, level) => sum + parseFloat(level.amount), 0);
+            const askVolume = orderBook.asks.reduce((sum: number, level) => sum + parseFloat(level.amount), 0);
 
             // Detect and correct order book imbalances
             if (askVolume > 0) {

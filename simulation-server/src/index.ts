@@ -13,8 +13,8 @@ dotenv.config();
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import { simulationService } from './simulation-service';
-import { SimulationRequest } from './types';
+import { simulationService } from './simulation-service.js';
+import { SimulationRequest } from './types.js';
 
 // Server configuration from environment variables with defaults
 const PORT = parseInt(process.env.PORT || '3002');

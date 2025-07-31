@@ -1,5 +1,5 @@
 import React from "react";
-import type { OrderBookLevel } from "@shared/types/trading.js";
+import type { OrderBookLevel } from "../types/trading.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface OrderBookProps {
