@@ -4,6 +4,7 @@ import { OrderBook } from '../order-book.js';
 import { MatchingEngine } from '../matching-engine.js';
 import { RedBlackTree } from '../red-black-tree.js';
 import { CryptoOrder, OrderSide } from '../../types/trading.js';
+import { numberToString } from '../../utils/precision.js';
 
 describe('Performance Tests', () => {
   describe('Red-Black Tree Performance', () => {
@@ -107,13 +108,13 @@ describe('Performance Tests', () => {
       id: faker.string.nanoid(),
       pair: 'BTC-USDT',
       side: side || (Math.random() < 0.5 ? 'buy' : 'sell'),
-      price: Math.floor(Math.random() * 1000) + 49000, // 49000-50000 range
-      amount: Math.random() * 10 + 0.1,
+      price: numberToString(Math.floor(Math.random() * 1000) + 49000), // 49000-50000 range
+      amount: numberToString(Math.random() * 10 + 0.1),
       type: 'limit',
       timestamp: Date.now(),
       userId: faker.string.uuid(),
       status: 'pending',
-      filledAmount: 0
+      filledAmount: '0'
     });
 
     it('should handle 50K order insertions in under 3 seconds', () => {
@@ -149,8 +150,8 @@ describe('Performance Tests', () => {
         const bestAsk = orderBook.getBestAsk();
         
         // These operations should still be very fast
-        if (bestBid) expect(bestBid.price).toBeTypeOf('number');
-        if (bestAsk) expect(bestAsk.price).toBeTypeOf('number');
+        if (bestBid) expect(bestBid.price).toBeTypeOf('string');
+        if (bestAsk) expect(bestAsk.price).toBeTypeOf('string');
       }
 
       const duration = Date.now() - startTime;
@@ -174,8 +175,8 @@ describe('Performance Tests', () => {
 
       for (let i = 0; i < numUpdates; i++) {
         const randomOrder = orders[Math.floor(Math.random() * orders.length)]!;
-        const fillAmount = Math.random() * randomOrder.amount * 0.5;
-        orderBook.updateOrderAmount(randomOrder.id, fillAmount);
+        const fillAmount = parseFloat(randomOrder.amount) * Math.random() * 0.5;
+        orderBook.updateOrderAmount(randomOrder.id, numberToString(fillAmount));
       }
 
       const duration = Date.now() - startTime;
@@ -191,12 +192,12 @@ describe('Performance Tests', () => {
       for (let i = 0; i < levelsPerSide; i++) {
         // Buy orders from 49000 down to 48001
         const buyOrder = createRandomOrder('buy');
-        buyOrder.price = 49000 - i;
+        buyOrder.price = numberToString(49000 - i);
         orderBook.addOrder(buyOrder);
 
         // Sell orders from 50000 up to 50999
         const sellOrder = createRandomOrder('sell');
-        sellOrder.price = 50000 + i;
+        sellOrder.price = numberToString(50000 + i);
         orderBook.addOrder(sellOrder);
       }
 
@@ -228,13 +229,13 @@ describe('Performance Tests', () => {
       id: faker.string.nanoid(),
       pair,
       side: Math.random() < 0.5 ? 'buy' : 'sell',
-      price: Math.floor(Math.random() * 2000) + 49000, // 49000-51000 range
-      amount: Math.random() * 5 + 0.1,
+      price: numberToString(Math.floor(Math.random() * 2000) + 49000), // 49000-51000 range
+      amount: numberToString(Math.random() * 5 + 0.1),
       type: 'limit',
       timestamp: Date.now(),
       userId: faker.string.uuid(),
       status: 'pending',
-      filledAmount: 0
+      filledAmount: '0'
     });
 
     it('should handle high-frequency order submissions', () => {
@@ -282,7 +283,7 @@ describe('Performance Tests', () => {
       for (let i = 0; i < marketOrders; i++) {
         const order = createRandomOrder();
         order.type = 'market';
-        order.price = 0; // Market orders don't need price
+        order.price = numberToString(0); // Market orders don't need price
         engine.submitOrder(order);
       }
 
@@ -330,9 +331,9 @@ describe('Performance Tests', () => {
         const order = createRandomOrder();
         // Separate bid/ask prices to prevent matching
         if (order.side === 'buy') {
-          order.price = Math.floor(Math.random() * 1000) + 40000; // 40000-41000 range for buys
+          order.price = numberToString(Math.floor(Math.random() * 1000) + 40000); // 40000-41000 range for buys
         } else {
-          order.price = Math.floor(Math.random() * 1000) + 60000; // 60000-61000 range for sells
+          order.price = numberToString(Math.floor(Math.random() * 1000) + 60000); // 60000-61000 range for sells
         }
         engine.submitOrder(order);
         orderIds.push({ id: order.id, pair: order.pair });
@@ -378,13 +379,13 @@ describe('Performance Tests', () => {
             id: faker.string.nanoid(),
             pair: 'BTC-USDT',
             side: Math.random() < 0.5 ? 'buy' : 'sell',
-            price: Math.floor(Math.random() * 1000) + 49000,
-            amount: Math.random() * 2 + 0.1,
+            price: numberToString(Math.floor(Math.random() * 1000) + 49000),
+            amount: numberToString(Math.random() * 2 + 0.1),
             type: 'limit',
             timestamp: Date.now(),
             userId: faker.string.uuid(),
             status: 'pending',
-            filledAmount: 0
+            filledAmount: '0'
           };
           
           engine.submitOrder(order);
@@ -427,13 +428,13 @@ describe('Performance Tests', () => {
           id: faker.string.nanoid(),
           pair: 'BTC-USDT',
           side: 'buy',
-          price: 50000,
-          amount: 1.0,
+          price: numberToString(50000),
+          amount: numberToString(1.0),
           type: 'limit',
           timestamp: Date.now(),
           userId: faker.string.uuid(),
           status: 'pending',
-          filledAmount: 0
+          filledAmount: '0'
         };
         engine.submitOrder(order);
       }
@@ -444,13 +445,13 @@ describe('Performance Tests', () => {
           id: faker.string.nanoid(),
           pair: 'BTC-USDT',
           side: Math.random() < 0.5 ? 'buy' : 'sell',
-          price: Math.floor(Math.random() * 1000) + 49000,
-          amount: Math.random() * 2 + 0.1,
+          price: numberToString(Math.floor(Math.random() * 1000) + 49000),
+          amount: numberToString(Math.random() * 2 + 0.1),
           type: 'limit',
           timestamp: Date.now(),
           userId: faker.string.uuid(),
           status: 'pending',
-          filledAmount: 0
+          filledAmount: '0'
         };
 
         const startTime = process.hrtime.bigint();

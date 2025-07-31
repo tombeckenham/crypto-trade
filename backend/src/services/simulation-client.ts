@@ -4,6 +4,7 @@
  */
 
 import 'dotenv/config';
+import { getErrorMessage } from '../utils/error-utils';
 
 interface SimulationRequest {
   ordersPerSecond: number;
@@ -14,7 +15,7 @@ interface SimulationRequest {
 
 interface SimulationResponse {
   message: string;
-  simulationId: string;
+  id: string;
   parameters: SimulationRequest;
   startTime: number;
   marketData?: any;
@@ -37,6 +38,12 @@ export class SimulationClient {
   private simulationServerUrl: string = process.env['SIMULATION_SERVER_URL'] || 'http://localhost:3002';
   private mainServerUrl: string = process.env['PUBLIC_URL'] || 'http://localhost:3001';
 
+  constructor() {
+    if (this.simulationServerUrl && !this.simulationServerUrl.startsWith('http')) {
+      this.simulationServerUrl = `http://${this.simulationServerUrl}`;
+    }
+  }
+
   async startExternalSimulation(params: SimulationRequest): Promise<SimulationResponse> {
     try {
       const response = await fetch(`${this.simulationServerUrl}/api/simulate`, {
@@ -52,10 +59,10 @@ export class SimulationClient {
         throw new Error(`Simulation server error: ${response.status}`);
       }
 
-      return await response.json() as SimulationResponse;
+      return response.json() as Promise<SimulationResponse>;
     } catch (error) {
       // Fallback to local simulation if external server unavailable
-      console.warn('External simulation server unavailable, falling back to local simulation');
+      console.warn('External simulation server unavailable, falling back to local simulation', getErrorMessage(error));
       throw error;
     }
   }
@@ -88,6 +95,16 @@ export class SimulationClient {
     }
 
     return await response.json() as SimulationStatus[];
+  }
+
+  async getSimulationLogs(simulationId: string): Promise<string> {
+    const response = await fetch(`${this.simulationServerUrl}/api/simulate/${simulationId}/logs`);
+
+    if (!response.ok) {
+      throw new Error(`Failed to get simulation logs: ${response.status}`);
+    }
+
+    return await response.text();
   }
 
   async isExternalSimulationAvailable(): Promise<boolean> {

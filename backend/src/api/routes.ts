@@ -47,7 +47,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     max: 100,
     timeWindow: '1 minute'
   };
-  
+
   const authenticatedRateLimit = {
     max: 1000,
     timeWindow: '1 minute',
@@ -444,6 +444,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
         200: {
           type: 'object',
           properties: {
+            id: { type: 'string', description: 'Simulation ID' },
             message: { type: 'string', description: 'Simulation status' },
             marketData: {
               type: 'object',
@@ -482,7 +483,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     }
 
     // Try external simulation server first for high-volume requests
-    if (!forceLocal && ordersPerSecond > 10000 && await simulationClient.isExternalSimulationAvailable()) {
+    if (!forceLocal && await simulationClient.isExternalSimulationAvailable()) {
       try {
         console.log(`Delegating high-volume simulation (${ordersPerSecond} orders/sec) to external server`);
         const response = await simulationClient.startExternalSimulation({
@@ -490,10 +491,10 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
           durationSeconds,
           pair
         });
+        console.log('External simulation response:', response);
         return reply.send({
-          ...response,
-          message: 'High-volume simulation started on external server',
-          externalSimulation: true
+          externalSimulation: true,
+          ...response
         });
       } catch (error) {
         console.warn('External simulation failed, falling back to local simulation:', error);
@@ -725,6 +726,49 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     });
   });
 
+  fastify.get<{ Params: { id: string } }>('/api/simulate/:id/logs', {
+    schema: {
+      tags: ['Simulation'],
+      summary: 'Get simulation logs',
+      description: 'Retrieve the logs of a simulation in CSV format',
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: { type: 'string', description: 'Simulation ID' }
+        }
+      },
+      response: {
+        200: {
+          type: 'string',
+          description: 'Simulation logs in CSV format'
+        },
+        404: {
+          type: 'object',
+          properties: {
+            error: { type: 'string', description: 'Error message' }
+          },
+          required: ['error']
+        },
+        500: errorSchema
+      }
+    }
+  }, async (request, reply) => {
+    const { id } = request.params;
+    try {
+      const logs = await simulationClient.getSimulationLogs(id);
+      reply.header('Content-Type', 'text/csv');
+      reply.header('Content-Disposition', `attachment; filename=simulation-${id}-logs.csv`);
+      return reply.send(logs);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('404')) {
+        return reply.code(404).send({ error: 'Simulation logs not found' });
+      }
+      console.error('Error fetching simulation logs:', error);
+      return reply.code(500).send({ error: 'Failed to retrieve simulation logs' });
+    }
+  });
+
   fastify.post('/api/generate-liquidity', {
     preHandler: validateApiKey,
     config: { rateLimit: authenticatedRateLimit },
@@ -766,12 +810,12 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
       }
     }
   }, async (request, reply) => {
-    const { 
-      pair, 
-      basePrice, 
-      orderCount = 100, 
-      spread = '0.01', 
-      maxDepth = '0.05' 
+    const {
+      pair,
+      basePrice,
+      orderCount = 100,
+      spread = '0.01',
+      maxDepth = '0.05'
     } = request.body as {
       pair: string;
       basePrice: string;
@@ -807,7 +851,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
         const depthFactor = Math.pow(Math.random(), 0.5); // Bias towards better prices
         const priceOffset = depthRange * depthFactor;
         const orderPrice = bidBase - priceOffset;
-        
+
         if (orderPrice <= 0) continue;
 
         // Vary order sizes - more small orders, fewer large ones
