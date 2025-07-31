@@ -8,7 +8,7 @@
  * - Adaptive spread and volatility calculations
  */
 
-import { MarketPrice, BinanceTicker } from './types.js';
+import { MarketPrice, BinanceTicker } from './types';
 
 /**
  * Service for managing market data and generating realistic trading parameters

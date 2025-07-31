@@ -9,12 +9,12 @@
  * - Resource management and cleanup
  */
 
-import { SimulationRequest, SimulationStatus, MarketPrice } from './types.js';
-import { CryptoOrder, MarketDepth } from './trading.js';
-import { marketDataService } from './market-data.js';
-import { createPooledOrder, releaseOrder, orderPool } from './object-pool.js';
+import { SimulationRequest, SimulationStatus, MarketPrice } from './types';
+import { CryptoOrder, MarketDepth } from '@shared/types/trading';
+import { marketDataService } from './market-data';
+import { createPooledOrder, releaseOrder, orderPool } from './object-pool';
 import { nanoid } from 'nanoid';
-import { SimulationLogger } from './simulation-logger.js';
+import { SimulationLogger } from './simulation-logger';
 
 /**
  * Main simulation service class that handles all simulation operations
@@ -276,7 +276,7 @@ export class SimulationService {
               if (bookImbalance > imbalanceThreshold) {
                 buyProbability = 0.25;
                 this.logger.log(simulationId, 'MarketCorrection', { type: 'imbalance', imbalance: bookImbalance, newBuyProb: buyProbability });
-              } 
+              }
               // Too many asks - increase buying pressure
               else if (bookImbalance < 1 / imbalanceThreshold) {
                 buyProbability = 0.75;
@@ -342,11 +342,11 @@ export class SimulationService {
 
         // Create order using object pool for efficiency
         const order = createPooledOrder(
-          pair, 
-          isBuy ? 'buy' : 'sell', 
-          isMarketOrder ? 'market' : 'limit', 
-          orderPrice.toString(), 
-          orderSize.toString(), 
+          pair,
+          isBuy ? 'buy' : 'sell',
+          isMarketOrder ? 'market' : 'limit',
+          orderPrice.toString(),
+          orderSize.toString(),
           `sim-user-${Math.floor(Math.random() * 1000)}`
         );
         this.logger.log(simulationId, 'OrderCreated', { ...order });
