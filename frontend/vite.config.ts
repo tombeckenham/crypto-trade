@@ -18,5 +18,6 @@ export default defineConfig({
   preview: {
     port: Number(process.env.PORT) || 5173,
     host: true,
+    allowedHosts: ['cryptotrade-frontend-production.up.railway.app']
   }
 })
