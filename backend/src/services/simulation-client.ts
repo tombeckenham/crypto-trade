@@ -4,7 +4,7 @@
  */
 
 import 'dotenv/config';
-import { getErrorMessage } from '../utils/error-utils';
+import { getErrorMessage } from '../utils/error-utils.js';
 import { FastifyBaseLogger } from 'fastify';
 
 interface SimulationRequest {
