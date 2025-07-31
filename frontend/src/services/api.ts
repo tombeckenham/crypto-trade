@@ -15,6 +15,63 @@ export interface ApiError {
   error: string;
 }
 
+
+export type PostApiSimulateResponses = {
+  /**
+   * Default Response
+   */
+  200: {
+    /**
+     * Simulation status
+     */
+    message?: string;
+    marketData?: {
+      /**
+       * Trading symbol
+       */
+      symbol?: string;
+      /**
+       * Current market price
+       */
+      currentPrice?: number;
+      /**
+       * Bid-ask spread
+       */
+      spread?: number;
+      /**
+       * Market volatility percentage
+       */
+      volatility?: string;
+      /**
+       * Average order size
+       */
+      avgOrderSize?: number;
+      /**
+       * Market order ratio percentage
+       */
+      marketOrderRatio?: string;
+    };
+    parameters?: {
+      ordersPerSecond?: number;
+      durationSeconds?: number;
+      pair?: string;
+      targetOrders?: number;
+      batchSize?: number;
+    };
+    /**
+     * Simulation start timestamp
+     */
+    startTime?: number;
+    /**
+     * Whether using external simulation server
+     */
+    externalSimulation?: boolean;
+  };
+};
+
+export type PostApiSimulateResponse = PostApiSimulateResponses[keyof PostApiSimulateResponses];
+
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = await response.json() as ApiError;
@@ -65,7 +122,7 @@ export const api = {
     return handleResponse(response);
   },
 
-  async startSimulation(ordersPerSecond: number, durationSeconds: number, pair: string) {
+  async startSimulation(ordersPerSecond: number, durationSeconds: number, pair: string): Promise<PostApiSimulateResponse> {
     const response = await fetch(`${API_BASE_URL}/simulate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

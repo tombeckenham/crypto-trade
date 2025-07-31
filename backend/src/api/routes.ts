@@ -28,7 +28,79 @@ interface TradesParams {
 }
 
 export function registerRoutes(fastify: FastifyInstance, matchingEngine: MatchingEngine): void {
-  fastify.post<{ Body: PlaceOrderBody }>('/api/orders', async (request, reply) => {
+  // Schema definitions for OpenAPI
+  const orderSchema = {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: 'Unique order identifier' },
+      pair: { type: 'string', description: 'Trading pair symbol' },
+      side: { type: 'string', enum: ['buy', 'sell'], description: 'Order side' },
+      type: { type: 'string', enum: ['market', 'limit'], description: 'Order type' },
+      price: { type: 'number', description: 'Order price (0 for market orders)' },
+      amount: { type: 'number', description: 'Order amount in base currency' },
+      timestamp: { type: 'number', description: 'Order creation timestamp' },
+      userId: { type: 'string', description: 'User identifier' },
+      status: { type: 'string', enum: ['pending', 'partial', 'filled', 'cancelled'] },
+      filledAmount: { type: 'number', description: 'Amount filled so far' }
+    }
+  };
+
+  const orderBookLevelSchema = {
+    type: 'object',
+    properties: {
+      price: { type: 'number', description: 'Price level' },
+      amount: { type: 'number', description: 'Total amount at this price' },
+      total: { type: 'number', description: 'Cumulative amount' },
+      orders: { type: 'array', items: orderSchema, description: 'Orders at this level' }
+    }
+  };
+
+  const marketDepthSchema = {
+    type: 'object',
+    properties: {
+      pair: { type: 'string', description: 'Trading pair' },
+      bids: { type: 'array', items: orderBookLevelSchema, description: 'Buy orders' },
+      asks: { type: 'array', items: orderBookLevelSchema, description: 'Sell orders' },
+      lastUpdateTime: { type: 'number', description: 'Last update timestamp' }
+    }
+  };
+
+  const errorSchema = {
+    type: 'object',
+    properties: {
+      error: { type: 'string', description: 'Error message' }
+    }
+  };
+
+  fastify.post<{ Body: PlaceOrderBody }>('/api/orders', {
+    schema: {
+      tags: ['Orders'],
+      summary: 'Place a new order',
+      description: 'Submit a new buy or sell order to the matching engine',
+      body: {
+        type: 'object',
+        required: ['pair', 'side', 'type', 'amount', 'userId'],
+        properties: {
+          pair: { type: 'string', description: 'Trading pair symbol' },
+          side: { type: 'string', enum: ['buy', 'sell'], description: 'Order side' },
+          type: { type: 'string', enum: ['market', 'limit'], description: 'Order type' },
+          price: { type: 'number', description: 'Order price (required for limit orders)' },
+          amount: { type: 'number', description: 'Order amount in base currency' },
+          userId: { type: 'string', description: 'User identifier' }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            order: orderSchema
+          }
+        },
+        400: errorSchema,
+        500: errorSchema
+      }
+    }
+  }, async (request, reply) => {
     const { pair, side, type, price, amount, userId } = request.body;
 
     if (type === 'limit' && !price) {
@@ -56,7 +128,37 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     }
   });
 
-  fastify.delete<{ Params: CancelOrderParams }>('/api/orders/:id', async (request, reply) => {
+  fastify.delete<{ Params: CancelOrderParams }>('/api/orders/:id', {
+    schema: {
+      tags: ['Orders'],
+      summary: 'Cancel an order',
+      description: 'Cancel an existing order by ID',
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+          id: { type: 'string', description: 'Order ID to cancel' }
+        }
+      },
+      querystring: {
+        type: 'object',
+        required: ['pair'],
+        properties: {
+          pair: { type: 'string', description: 'Trading pair' }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', description: 'Success message' }
+          }
+        },
+        400: errorSchema,
+        404: errorSchema
+      }
+    }
+  }, async (request, reply) => {
     const { id } = request.params;
     const pair = (request.query as any).pair as string;
 
@@ -73,7 +175,30 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     }
   });
 
-  fastify.get<{ Params: OrderBookParams }>('/api/orderbook/:pair', async (request, reply) => {
+  fastify.get<{ Params: OrderBookParams }>('/api/orderbook/:pair', {
+    schema: {
+      tags: ['Market Data'],
+      summary: 'Get order book',
+      description: 'Retrieve current order book for a trading pair',
+      params: {
+        type: 'object',
+        required: ['pair'],
+        properties: {
+          pair: { type: 'string', description: 'Trading pair symbol' }
+        }
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          levels: { type: 'integer', minimum: 1, maximum: 1000, default: 20, description: 'Number of price levels to return' }
+        }
+      },
+      response: {
+        200: marketDepthSchema,
+        500: errorSchema
+      }
+    }
+  }, async (request, reply) => {
     const { pair } = request.params;
     const levels = parseInt((request.query as any).levels as string) || 20;
 
@@ -85,7 +210,30 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     }
   });
 
-  fastify.get<{ Params: TradesParams }>('/api/trades/:pair', async (request, reply) => {
+  fastify.get<{ Params: TradesParams }>('/api/trades/:pair', {
+    schema: {
+      tags: ['Market Data'],
+      summary: 'Get recent trades',
+      description: 'Retrieve recent trade history for a trading pair',
+      params: {
+        type: 'object',
+        required: ['pair'],
+        properties: {
+          pair: { type: 'string', description: 'Trading pair symbol' }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            pair: { type: 'string', description: 'Trading pair' },
+            trades: { type: 'array', items: { type: 'object' }, description: 'Trade history' },
+            message: { type: 'string', description: 'Status message' }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
     const { pair } = request.params;
 
     return reply.send({
@@ -95,7 +243,31 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     });
   });
 
-  fastify.get('/api/portfolio', async (request, reply) => {
+  fastify.get('/api/portfolio', {
+    schema: {
+      tags: ['Portfolio'],
+      summary: 'Get user portfolio',
+      description: 'Retrieve user portfolio with balances and positions',
+      querystring: {
+        type: 'object',
+        required: ['userId'],
+        properties: {
+          userId: { type: 'string', description: 'User identifier' }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            userId: { type: 'string', description: 'User identifier' },
+            balances: { type: 'object', description: 'Asset balances' },
+            message: { type: 'string', description: 'Status message' }
+          }
+        },
+        400: errorSchema
+      }
+    }
+  }, async (request, reply) => {
     const userId = (request.query as any).userId as string;
 
     if (!userId) {
@@ -109,7 +281,32 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     });
   });
 
-  fastify.get('/api/metrics', async (_request, reply) => {
+  fastify.get('/api/metrics', {
+    schema: {
+      tags: ['System'],
+      summary: 'Get system metrics',
+      description: 'Retrieve system performance metrics and statistics',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            timestamp: { type: 'number', description: 'Metrics timestamp' },
+            pairs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  pair: { type: 'string', description: 'Trading pair' },
+                  orderCount: { type: 'number', description: 'Total orders' },
+                  tradeCount: { type: 'number', description: 'Total trades' }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }, async (_request, reply) => {
     const pairs = matchingEngine.getSupportedPairs();
     const stats = pairs.map(pair => ({
       ...matchingEngine.getOrderBookStats(pair)
@@ -121,7 +318,32 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     });
   });
 
-  fastify.get('/api/pairs', async (_request, reply) => {
+  fastify.get('/api/pairs', {
+    schema: {
+      tags: ['Market Data'],
+      summary: 'Get trading pairs',
+      description: 'Retrieve list of available trading pairs',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            pairs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  symbol: { type: 'string', description: 'Trading pair symbol' },
+                  baseCurrency: { type: 'string', description: 'Base currency' },
+                  quoteCurrency: { type: 'string', description: 'Quote currency' },
+                  active: { type: 'boolean', description: 'Whether pair is active for trading' }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }, async (_request, reply) => {
     return reply.send({
       pairs: [
         { symbol: 'BTC-USDT', baseCurrency: 'BTC', quoteCurrency: 'USDT', active: true },
@@ -133,7 +355,24 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     });
   });
 
-  fastify.get('/api/health', async (_request, reply) => {
+  fastify.get('/api/health', {
+    schema: {
+      tags: ['System'],
+      summary: 'Health check',
+      description: 'Check system health status',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['ok'], description: 'Health status' },
+            timestamp: { type: 'number', description: 'Check timestamp' },
+            service: { type: 'string', description: 'Service name' },
+            version: { type: 'string', description: 'Service version' }
+          }
+        }
+      }
+    }
+  }, async (_request, reply) => {
     return reply.status(200).send({
       status: 'ok',
       timestamp: Date.now(),
@@ -142,7 +381,55 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     });
   });
 
-  fastify.post('/api/simulate', async (request, reply) => {
+  fastify.post('/api/simulate', {
+    schema: {
+      tags: ['Simulation'],
+      summary: 'Start trading simulation',
+      description: 'Start a high-volume trading simulation with realistic market data',
+      body: {
+        type: 'object',
+        properties: {
+          ordersPerSecond: { type: 'integer', minimum: 1, maximum: 100000, default: 1000, description: 'Orders per second' },
+          durationSeconds: { type: 'integer', minimum: 1, maximum: 3600, default: 10, description: 'Simulation duration' },
+          pair: { type: 'string', default: 'BTC-USDT', description: 'Trading pair to simulate' },
+          forceLocal: { type: 'boolean', default: false, description: 'Force local simulation' }
+        }
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', description: 'Simulation status' },
+            marketData: {
+              type: 'object',
+              properties: {
+                symbol: { type: 'string', description: 'Trading symbol' },
+                currentPrice: { type: 'number', description: 'Current market price' },
+                spread: { type: 'number', description: 'Bid-ask spread' },
+                volatility: { type: 'string', description: 'Market volatility percentage' },
+                avgOrderSize: { type: 'number', description: 'Average order size' },
+                marketOrderRatio: { type: 'string', description: 'Market order ratio percentage' }
+              }
+            },
+            parameters: {
+              type: 'object',
+              properties: {
+                ordersPerSecond: { type: 'number' },
+                durationSeconds: { type: 'number' },
+                pair: { type: 'string' },
+                targetOrders: { type: 'number' },
+                batchSize: { type: 'number' }
+              }
+            },
+            startTime: { type: 'number', description: 'Simulation start timestamp' },
+            externalSimulation: { type: 'boolean', description: 'Whether using external simulation server' }
+          }
+        },
+        400: errorSchema,
+        500: errorSchema
+      }
+    }
+  }, async (request, reply) => {
     const { ordersPerSecond = 1000, durationSeconds = 10, pair = 'BTC-USDT', forceLocal = false } = request.body as any;
 
     if (ordersPerSecond > 100000) {
@@ -355,7 +642,32 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     });
   });
 
-  fastify.get('/api/engine/stats', async (_request, reply) => {
+  fastify.get('/api/engine/stats', {
+    schema: {
+      tags: ['System'],
+      summary: 'Get matching engine statistics',
+      description: 'Retrieve detailed matching engine performance statistics',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            timestamp: { type: 'number', description: 'Stats timestamp' },
+            engine: {
+              type: 'object',
+              description: 'Engine-level statistics'
+            },
+            pairs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                description: 'Per-pair statistics'
+              }
+            }
+          }
+        }
+      }
+    }
+  }, async (_request, reply) => {
     const stats = matchingEngine.getEngineStats();
     return reply.send({
       timestamp: Date.now(),

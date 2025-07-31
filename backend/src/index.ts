@@ -1,5 +1,7 @@
 import fastify from 'fastify';
 import cors from '@fastify/cors';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 import { MatchingEngine } from './core/matching-engine.js';
 import { WebSocketService } from './services/websocket-service.js';
 import { registerRoutes } from './api/routes.js';
@@ -26,6 +28,160 @@ async function start() {
     });
     console.log('CORS registered');
 
+    await server.register(swagger, {
+      openapi: {
+        openapi: '3.0.0',
+        info: {
+          title: 'CryptoTrade API',
+          description: 'High-performance cryptocurrency trading system API with ultra-high volume order processing and sub-millisecond latency',
+          version: '1.0.0',
+          contact: {
+            name: 'CryptoTrade Support',
+            email: 'support@cryptotrade.com'
+          },
+          license: {
+            name: 'MIT',
+            url: 'https://opensource.org/licenses/MIT'
+          }
+        },
+        servers: [
+          {
+            url: 'http://localhost:3001',
+            description: 'Development server'
+          }
+        ],
+        tags: [
+          { name: 'Orders', description: 'Order management endpoints' },
+          { name: 'Market Data', description: 'Market data and order book endpoints' },
+          { name: 'Portfolio', description: 'User portfolio management' },
+          { name: 'System', description: 'System health and metrics' },
+          { name: 'Simulation', description: 'Trading simulation endpoints' },
+          { name: 'WebSocket', description: 'Real-time WebSocket connections' }
+        ],
+        components: {
+          schemas: {
+            Error: {
+              type: 'object',
+              properties: {
+                error: { type: 'string', description: 'Error message' }
+              }
+            },
+            MarketDataMessage: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['trade', 'orderbook_update', 'ticker'] },
+                pair: { type: 'string', description: 'Trading pair' },
+                data: { type: 'object', description: 'Message payload' },
+                timestamp: { type: 'number', description: 'Message timestamp' }
+              }
+            },
+            OrderUpdateMessage: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['order_placed', 'order_filled', 'order_cancelled'] },
+                orderId: { type: 'string', description: 'Order identifier' },
+                userId: { type: 'string', description: 'User identifier' },
+                data: { type: 'object', description: 'Order data' },
+                timestamp: { type: 'number', description: 'Message timestamp' }
+              }
+            }
+          }
+        },
+        paths: {
+          '/ws/market': {
+            get: {
+              tags: ['WebSocket'],
+              summary: 'WebSocket Market Data',
+              description: 'Real-time market data WebSocket connection. Upgrade to WebSocket protocol to receive live market updates.',
+              parameters: [
+                {
+                  name: 'Connection',
+                  in: 'header',
+                  required: true,
+                  schema: { type: 'string', enum: ['Upgrade'] }
+                },
+                {
+                  name: 'Upgrade',
+                  in: 'header',
+                  required: true,
+                  schema: { type: 'string', enum: ['websocket'] }
+                }
+              ],
+              responses: {
+                101: {
+                  description: 'Switching Protocols - WebSocket connection established',
+                  content: {
+                    'application/json': {
+                      schema: {
+                        oneOf: [
+                          { $ref: '#/components/schemas/MarketDataMessage' }
+                        ]
+                      }
+                    }
+                  }
+                },
+                400: { $ref: '#/components/schemas/Error' }
+              }
+            }
+          },
+          '/ws/orders': {
+            get: {
+              tags: ['WebSocket'],
+              summary: 'WebSocket Order Updates',
+              description: 'Real-time order updates WebSocket connection. Upgrade to WebSocket protocol to receive user-specific order updates.',
+              parameters: [
+                {
+                  name: 'Connection',
+                  in: 'header',
+                  required: true,
+                  schema: { type: 'string', enum: ['Upgrade'] }
+                },
+                {
+                  name: 'Upgrade',
+                  in: 'header',
+                  required: true,
+                  schema: { type: 'string', enum: ['websocket'] }
+                }
+              ],
+              responses: {
+                101: {
+                  description: 'Switching Protocols - WebSocket connection established',
+                  content: {
+                    'application/json': {
+                      schema: {
+                        oneOf: [
+                          { $ref: '#/components/schemas/OrderUpdateMessage' }
+                        ]
+                      }
+                    }
+                  }
+                },
+                400: { $ref: '#/components/schemas/Error' }
+              }
+            }
+          }
+        }
+      }
+    });
+    console.log('Swagger registered');
+
+    await server.register(swaggerUi, {
+      routePrefix: '/docs',
+      uiConfig: {
+        docExpansion: 'list',
+        deepLinking: false
+      },
+      uiHooks: {
+        onRequest: function (_request, _reply, next) { next() },
+        preHandler: function (_request, _reply, next) { next() }
+      },
+      staticCSP: true,
+      transformStaticCSP: (header) => header,
+      transformSpecification: (swaggerObject, _request, _reply) => { return swaggerObject },
+      transformSpecificationClone: true
+    });
+    console.log('Swagger UI registered');
+
     await wsService.register(server);
     console.log('WebSocket service registered');
     
@@ -42,6 +198,7 @@ async function start() {
     console.log(`WebSocket endpoint: ws://${host}:${port}/ws/market`);
     console.log(`REST API: http://${host}:${port}/api`);
     console.log(`Health check: http://${host}:${port}/api/health`);
+    console.log(`📚 API Documentation: http://${host}:${port}/docs`);
   } catch (err) {
     console.error('❌ Failed to start server:', err);
     server.log.error(err);

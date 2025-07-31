@@ -3,6 +3,8 @@
  * Allows running high-volume simulations without affecting main trading server
  */
 
+import 'dotenv/config';
+
 interface SimulationRequest {
   ordersPerSecond: number;
   durationSeconds: number;
@@ -28,10 +30,13 @@ interface SimulationStatus {
   error?: string;
 }
 
+console.log('SIMULATION_SERVER_URL', process.env['SIMULATION_SERVER_URL'])
+console.log('PUBLIC_URL', process.env['PUBLIC_URL'])
+
 export class SimulationClient {
   private simulationServerUrl: string = process.env['SIMULATION_SERVER_URL'] || 'http://localhost:3002';
   private mainServerUrl: string = process.env['PUBLIC_URL'] || 'http://localhost:3001';
-  
+
   async startExternalSimulation(params: SimulationRequest): Promise<SimulationResponse> {
     try {
       const response = await fetch(`${this.simulationServerUrl}/api/simulate`, {
@@ -57,7 +62,7 @@ export class SimulationClient {
 
   async getSimulationStatus(simulationId: string): Promise<SimulationStatus> {
     const response = await fetch(`${this.simulationServerUrl}/api/simulate/${simulationId}/status`);
-    
+
     if (!response.ok) {
       throw new Error(`Failed to get simulation status: ${response.status}`);
     }
@@ -77,7 +82,7 @@ export class SimulationClient {
 
   async listActiveSimulations(): Promise<SimulationStatus[]> {
     const response = await fetch(`${this.simulationServerUrl}/api/simulate/active`);
-    
+
     if (!response.ok) {
       throw new Error(`Failed to list simulations: ${response.status}`);
     }
@@ -89,7 +94,7 @@ export class SimulationClient {
     if (!process.env['SIMULATION_SERVER_URL']) {
       return false;
     }
-    
+
     try {
       const response = await fetch(`${this.simulationServerUrl}/health`, {
         method: 'GET',
