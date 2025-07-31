@@ -76,7 +76,7 @@ export class WebSocketService {
 
   disconnect(): void {
     this.shouldReconnect = false;
-    
+
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -98,7 +98,7 @@ export class WebSocketService {
   subscribe(channel: string, pair: string, handler: MessageHandler): void {
     const key = `${channel}:${pair}`;
     console.log(`Subscribing to ${key}`);
-    
+
     if (!this.handlers.has(key)) {
       this.handlers.set(key, new Set());
     }
@@ -122,12 +122,12 @@ export class WebSocketService {
   unsubscribe(channel: string, pair: string, handler: MessageHandler): void {
     const key = `${channel}:${pair}`;
     const handlers = this.handlers.get(key);
-    
+
     if (handlers) {
       handlers.delete(handler);
       if (handlers.size === 0) {
         this.handlers.delete(key);
-        
+
         const subs = this.subscriptions.get(channel);
         if (subs) {
           subs.delete(pair);
@@ -150,14 +150,12 @@ export class WebSocketService {
   private handleMessage(data: string): void {
     try {
       const message = JSON.parse(data);
-      console.log('WebSocket message received:', message);
-      
+
       if (message.type === 'orderbook' || message.type === 'trade') {
         const key = `${message.type === 'orderbook' ? 'orderbook' : 'trades'}:${message.pair}`;
         const handlers = this.handlers.get(key);
-        
-        console.log(`Looking for handlers for key: ${key}, found ${handlers?.size || 0} handlers`);
-        
+
+
         if (handlers) {
           handlers.forEach(handler => handler(message.data));
         }

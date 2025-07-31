@@ -23,7 +23,7 @@ export class WebSocketService {
   private pingInterval: NodeJS.Timeout | null = null;
   private updateThrottles: Map<string, NodeJS.Timeout> = new Map();
   private tradeBuffer: Map<string, CryptoTrade[]> = new Map();
-  private readonly UPDATE_THROTTLE_MS = 100; // Throttle updates to 10Hz max
+  private readonly UPDATE_THROTTLE_MS = 16; // Throttle updates to ~60Hz for responsive simulation
   private readonly MAX_TRADES_PER_BATCH = 10;
 
   constructor(matchingEngine: MatchingEngine) {

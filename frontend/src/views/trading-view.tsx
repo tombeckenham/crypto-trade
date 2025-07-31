@@ -32,6 +32,7 @@ export const TradingView: React.FC = () => {
 	} = useTradingStore();
 	const [wsOrderBook, setWsOrderBook] = useState<MarketDepth | null>(null);
 	const [isSimulating, setIsSimulating] = useState(false);
+	const [lastSimulationId, setLastSimulationId] = useState<string | null>(null);
 	const isConnecting = useRef(false);
 
 	const { data: orderBook } = useOrderBook(selectedPair);
@@ -73,7 +74,6 @@ export const TradingView: React.FC = () => {
 		if (connectionStatus !== "connected") return;
 
 		const handleOrderBookUpdate = (data: MarketDepth) => {
-			console.log("Order book update received:", data);
 			setWsOrderBook(data);
 		};
 
@@ -146,6 +146,8 @@ export const TradingView: React.FC = () => {
 							<SimulationControls
 								selectedPair={selectedPair}
 								onSimulationStateChange={setIsSimulating}
+								lastSimulationId={lastSimulationId}
+								setLastSimulationId={setLastSimulationId}
 							/>
 
 							<LiquidityGenerator pair={selectedPair} />

@@ -133,23 +133,35 @@ class MarketDataService {
     marketOrderRatio: number;
   } {
     const price = marketPrice.price;
-    const spread = Math.max(0.01, marketPrice.ask - marketPrice.bid);
+    // Ensure realistic spread based on price level
+    let spread = Math.max(0.01, marketPrice.ask - marketPrice.bid);
+    
+    // Adjust spread based on price level for realism
+    if (price > 10000) {
+      spread = Math.max(1, spread); // At least $1 spread for high-priced assets
+    } else if (price > 1000) {
+      spread = Math.max(0.1, spread); // At least $0.10 spread
+    } else if (price > 10) {
+      spread = Math.max(0.01, spread); // At least $0.01 spread
+    } else {
+      spread = Math.max(0.001, spread); // At least $0.001 spread for low-priced assets
+    }
     
     const dailyRange = marketPrice.high24h - marketPrice.low24h;
-    const volatility = dailyRange / price;
+    const volatility = Math.min(0.1, dailyRange / price); // Cap volatility at 10%
     
     let avgOrderSize: number;
     if (price > 10000) {
-      avgOrderSize = 0.1;
+      avgOrderSize = 0.05; // Smaller orders for expensive assets
     } else if (price > 1000) {
-      avgOrderSize = 1;
+      avgOrderSize = 0.5;
     } else if (price > 10) {
-      avgOrderSize = 10;
+      avgOrderSize = 5;
     } else {
-      avgOrderSize = 1000;
+      avgOrderSize = 500;
     }
 
-    const marketOrderRatio = Math.max(0.2, Math.min(0.4, volatility * 100));
+    const marketOrderRatio = Math.max(0.1, Math.min(0.25, volatility * 20)); // Aggressive but realistic: 10-25% market orders
 
     return {
       basePrice: price,

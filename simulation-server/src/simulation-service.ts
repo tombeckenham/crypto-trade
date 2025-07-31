@@ -1,51 +1,138 @@
-import { SimulationRequest, SimulationStatus, CryptoOrder } from './types.js';
+import { SimulationRequest, SimulationStatus, MarketPrice } from './types.js';
+import { CryptoOrder, MarketDepth, OrderBookLevel } from './trading.js';
 import { marketDataService } from './market-data.js';
 import { createPooledOrder, releaseOrder, orderPool } from './object-pool.js';
 import { nanoid } from 'nanoid';
+import { SimulationLogger } from './simulation-logger.js';
 
 export class SimulationService {
   private activeSimulations = new Map<string, SimulationStatus>();
   private simulationTimeouts = new Map<string, NodeJS.Timeout>();
+  private logger = new SimulationLogger();
 
   async startSimulation(request: SimulationRequest): Promise<{ simulationId: string; message: string }> {
     const simulationId = nanoid();
-    
-    // Fetch market data
-    const marketPrice = await marketDataService.getCurrentPrice(request.pair);
-    if (!marketPrice) {
-      throw new Error('Failed to fetch market data');
+    this.logger.log(simulationId, 'SimulationStart', { ...request });
+
+    try {
+      const baseEndpoint = request.targetEndpoint.replace('/api/orders', '');
+      const orderBook = await this.getCurrentOrderBook(request.pair, baseEndpoint);
+      let marketPrice: MarketPrice;
+      let params;
+
+      if (orderBook && orderBook.bids.length > 0 && orderBook.asks.length > 0) {
+        const bestBid = parseFloat(orderBook.bids[0].price);
+        const bestAsk = parseFloat(orderBook.asks[0].price);
+        const midPrice = (bestBid + bestAsk) / 2;
+
+        this.logger.log(simulationId, 'MarketState', { source: 'orderbook', midPrice, bestBid, bestAsk });
+
+        marketPrice = {
+          symbol: request.pair,
+          price: midPrice,
+          bid: bestBid,
+          ask: bestAsk,
+          high24h: midPrice * 1.05, // Placeholder
+          low24h: midPrice * 0.95, // Placeholder
+          volume24h: 0,
+          change24h: 0,
+          changePercent24h: 0
+        };
+
+        params = marketDataService.generateRealisticOrderParams(marketPrice);
+      } else {
+        const fetchedMarketPrice = await marketDataService.getCurrentPrice(request.pair);
+        if (!fetchedMarketPrice) {
+          throw new Error('Failed to fetch market data');
+        }
+        marketPrice = fetchedMarketPrice;
+        this.logger.log(simulationId, 'MarketState', { source: 'external', price: marketPrice.price });
+        params = marketDataService.generateRealisticOrderParams(marketPrice);
+      }
+
+      const status: SimulationStatus = {
+        id: simulationId,
+        status: 'running',
+        ordersProcessed: 0,
+        ordersSent: 0,
+        startTime: Date.now(),
+        memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        parameters: request
+      };
+
+      this.activeSimulations.set(simulationId, status);
+      await this.seedInitialLiquidity(simulationId, request, params);
+      this.runSimulation(simulationId, request, params).catch(error => {
+        this.logger.log(simulationId, 'SimulationError', { error: error.message });
+        const failedStatus = this.activeSimulations.get(simulationId);
+        if (failedStatus) {
+          failedStatus.status = 'failed';
+          failedStatus.error = error.message;
+          failedStatus.endTime = Date.now();
+        }
+      });
+
+      return {
+        simulationId,
+        message: `High-volume simulation started: ${request.ordersPerSecond} orders/sec for ${request.durationSeconds}s`
+      };
+    } catch (error) {
+      this.logger.log(simulationId, 'SimulationError', { error: error.message });
+      throw error;
+    }
+  }
+
+  private async getCurrentOrderBook(pair: string, baseEndpoint: string): Promise<MarketDepth | null> {
+    try {
+      const response = await fetch(`${baseEndpoint}/api/orderbook/${pair}?levels=5`);
+      if (!response.ok) {
+        console.warn(`Failed to fetch order book: ${response.status}`);
+        return null;
+      }
+      return await response.json();
+    } catch (error) {
+      console.warn('Error fetching order book:', error);
+      return null;
+    }
+  }
+
+  private async seedInitialLiquidity(
+    simulationId: string,
+    request: SimulationRequest,
+    params: { basePrice: number; spread: number; volatility: number; avgOrderSize: number; marketOrderRatio: number }
+  ): Promise<void> {
+    const { pair, targetEndpoint } = request;
+    const seedOrders: CryptoOrder[] = [];
+
+    this.logger.log(simulationId, 'SeedingLiquidity', { count: 20, basePrice: params.basePrice, spread: params.spread });
+
+    for (let i = 1; i <= 20; i++) {
+      const bidPrice = params.basePrice - (params.spread * i * 0.5);
+      const bidSize = params.avgOrderSize * (1 + Math.random() * 2);
+      const bidOrder = createPooledOrder(pair, 'buy', 'limit', bidPrice.toString(), bidSize.toString(), `seed-user-${Math.floor(Math.random() * 1000)}`);
+      seedOrders.push(bidOrder);
+
+      const askPrice = params.basePrice + (params.spread * i * 0.5);
+      const askSize = params.avgOrderSize * (1 + Math.random() * 2);
+      const askOrder = createPooledOrder(pair, 'sell', 'limit', askPrice.toString(), askSize.toString(), `seed-user-${Math.floor(Math.random() * 1000)}`);
+      seedOrders.push(askOrder);
     }
 
-    const params = marketDataService.generateRealisticOrderParams(marketPrice);
-    
-    // Create simulation status
-    const status: SimulationStatus = {
-      id: simulationId,
-      status: 'running',
-      ordersProcessed: 0,
-      ordersSent: 0,
-      startTime: Date.now(),
-      memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-      parameters: request
-    };
-
-    this.activeSimulations.set(simulationId, status);
-
-    // Start simulation in background
-    this.runSimulation(simulationId, request, params).catch(error => {
-      console.error(`Simulation ${simulationId} failed:`, error);
-      const failedStatus = this.activeSimulations.get(simulationId);
-      if (failedStatus) {
-        failedStatus.status = 'failed';
-        failedStatus.error = error.message;
-        failedStatus.endTime = Date.now();
-      }
-    });
-
-    return {
-      simulationId,
-      message: `High-volume simulation started: ${request.ordersPerSecond} orders/sec for ${request.durationSeconds}s`
-    };
+    try {
+      const results = await Promise.allSettled(seedOrders.map(order => this.sendOrderToMainServer(order, targetEndpoint)));
+      let successful = 0;
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          successful++;
+        } else {
+          this.logger.log(simulationId, 'SeedOrderFailed', { orderId: seedOrders[index].id, reason: result.reason });
+        }
+        releaseOrder(seedOrders[index]);
+      });
+      this.logger.log(simulationId, 'SeedingComplete', { successful, total: seedOrders.length });
+    } catch (error) {
+      this.logger.log(simulationId, 'SeedingError', { error: error.message });
+    }
   }
 
   private async runSimulation(
@@ -58,8 +145,7 @@ export class SimulationService {
 
     const { ordersPerSecond, durationSeconds, pair, targetEndpoint } = request;
     const targetOrders = ordersPerSecond * durationSeconds;
-    
-    // Optimized batch processing for high volumes
+
     const batchSize = Math.min(50, Math.max(5, ordersPerSecond / 100));
     const batchDelay = (1000 / ordersPerSecond) * batchSize;
 
@@ -72,28 +158,76 @@ export class SimulationService {
         return;
       }
 
+      const baseEndpoint = targetEndpoint.replace('/api/orders', '');
+      const orderBook = await this.getCurrentOrderBook(pair, baseEndpoint);
+
+      let buyProbability = 0.52;
+      let isWideSpread = false;
+
+      if (orderBook && orderBook.bids.length > 0 && orderBook.asks.length > 0) {
+        const bestBid = parseFloat(orderBook.bids[0].price);
+        const bestAsk = parseFloat(orderBook.asks[0].price);
+
+        if (bestBid > 0 && bestAsk > 0) {
+          const midPrice = (bestBid + bestAsk) / 2;
+          const spread = bestAsk - bestBid;
+
+          if (bestBid >= bestAsk) {
+            this.logger.log(simulationId, 'MarketCorrection', { type: 'crossed', bestBid, bestAsk });
+            params.marketOrderRatio = 1.0;
+            buyProbability = 0.5;
+          } else {
+            params.marketOrderRatio = Math.max(0.1, Math.min(0.25, params.volatility * 20));
+            const bidVolume = orderBook.bids.reduce((sum, level) => sum + parseFloat(level.amount), 0);
+            const askVolume = orderBook.asks.reduce((sum, level) => sum + parseFloat(level.amount), 0);
+
+            if (askVolume > 0) {
+              const bookImbalance = bidVolume / askVolume;
+              const imbalanceThreshold = 1.5;
+
+              if (bookImbalance > imbalanceThreshold) {
+                buyProbability = 0.25;
+                this.logger.log(simulationId, 'MarketCorrection', { type: 'imbalance', imbalance: bookImbalance, newBuyProb: buyProbability });
+              } else if (bookImbalance < 1 / imbalanceThreshold) {
+                buyProbability = 0.75;
+                this.logger.log(simulationId, 'MarketCorrection', { type: 'imbalance', imbalance: bookImbalance, newBuyProb: buyProbability });
+              }
+            }
+
+            const spreadRatio = spread / midPrice;
+            const maxSpreadRatio = 0.02;
+            if (spreadRatio > maxSpreadRatio) {
+              isWideSpread = true;
+              this.logger.log(simulationId, 'MarketCorrection', { type: 'widespread', spreadRatio, midPrice });
+              buyProbability = 0.5;
+            }
+          }
+
+          params.basePrice = midPrice;
+          currentPrice = midPrice;
+          params.spread = Math.max(0.01, spread);
+        }
+      }
+
       const batch: CryptoOrder[] = [];
-      
-      // Generate batch of orders
       for (let i = 0; i < batchSize && orderCount < targetOrders; i++) {
         const isMarketOrder = Math.random() < params.marketOrderRatio;
-        const isBuy = Math.random() < 0.5;
-        
-        // Realistic price variation
-        const volatilityFactor = params.volatility * (Math.random() - 0.5) * 2;
-        const meanReversion = (params.basePrice - currentPrice) * 0.05;
-        const priceChange = currentPrice * (volatilityFactor * 0.05 + meanReversion * 0.01);
-        
+        const isBuy = Math.random() < buyProbability;
+
         let orderPrice: number;
         if (isMarketOrder) {
           orderPrice = 0;
         } else {
-          const spreadMultiplier = (Math.random() - 0.5) * 6;
-          const spreadOffset = params.spread * spreadMultiplier;
-          orderPrice = Math.max(0.01, currentPrice + priceChange + spreadOffset);
+          if (isWideSpread) {
+            const priceOffset = (params.spread / 2) * Math.random();
+            orderPrice = isBuy ? params.basePrice - priceOffset : params.basePrice + priceOffset;
+          } else {
+            const priceChange = currentPrice * (params.volatility * (Math.random() - 0.5) * 0.1);
+            const spreadOffset = (params.spread / 2) * (1 + Math.random());
+            orderPrice = isBuy ? currentPrice + priceChange - spreadOffset : currentPrice + priceChange + spreadOffset;
+          }
         }
 
-        // Realistic order sizes
         let orderSize: number;
         const sizeRandom = Math.random();
         if (sizeRandom < 0.7) {
@@ -103,83 +237,42 @@ export class SimulationService {
         } else {
           orderSize = params.avgOrderSize * (5 + Math.random() * 20);
         }
-        
-        const order = createPooledOrder(
-          pair,
-          isBuy ? 'buy' : 'sell',
-          isMarketOrder ? 'market' : 'limit',
-          orderPrice,
-          orderSize,
-          `sim-user-${Math.floor(Math.random() * 1000)}`
-        );
 
+        const order = createPooledOrder(pair, isBuy ? 'buy' : 'sell', isMarketOrder ? 'market' : 'limit', orderPrice.toString(), orderSize.toString(), `sim-user-${Math.floor(Math.random() * 1000)}`);
+        this.logger.log(simulationId, 'OrderCreated', { ...order });
         batch.push(order);
         orderCount++;
       }
 
-      // Send batch to main trading server
       try {
-        const results = await Promise.allSettled(
-          batch.map(order => this.sendOrderToMainServer(order, targetEndpoint))
-        );
-        
+        const results = await Promise.allSettled(batch.map(order => this.sendOrderToMainServer(order, targetEndpoint)));
         results.forEach((result, index) => {
           if (result.status === 'fulfilled') {
             successfulSends++;
           } else {
-            console.warn(`Failed to send order ${batch[index].id}:`, result.reason);
+            this.logger.log(simulationId, 'OrderSendFailed', { orderId: batch[index].id, reason: result.reason });
           }
-          // Release order back to pool
           releaseOrder(batch[index]);
         });
 
-        // Update status
         status.ordersProcessed = orderCount;
         status.ordersSent = successfulSends;
         status.memoryUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-
-        // Memory monitoring
-        if (status.memoryUsage > 1000) { // 1GB warning for simulation server
-          console.warn(`Simulation ${simulationId}: High memory usage ${status.memoryUsage}MB`);
-          if (global.gc) {
-            global.gc();
-          }
-        }
-
       } catch (error) {
-        console.error(`Batch processing failed for simulation ${simulationId}:`, error);
+        this.logger.log(simulationId, 'BatchError', { error: error.message });
       }
 
-      // Schedule next batch
       if (orderCount < targetOrders && status.status === 'running') {
         const timeout = setTimeout(processBatch, batchDelay);
         this.simulationTimeouts.set(simulationId, timeout);
       } else {
-        // Simulation completed
         status.status = 'completed';
         status.endTime = Date.now();
-        
-        const duration = (status.endTime - status.startTime) / 1000;
-        const actualRate = status.ordersSent / duration;
-        
-        console.log(`Simulation ${simulationId} completed:`);
-        console.log(`- Orders processed: ${status.ordersProcessed}`);
-        console.log(`- Orders sent: ${status.ordersSent}`);
-        console.log(`- Duration: ${duration.toFixed(1)}s`);
-        console.log(`- Actual rate: ${actualRate.toFixed(0)} orders/sec`);
-        console.log(`- Success rate: ${((status.ordersSent / status.ordersProcessed) * 100).toFixed(1)}%`);
-        
-        // Cleanup
+        this.logger.log(simulationId, 'SimulationEnd', { ...status });
         this.simulationTimeouts.delete(simulationId);
-        
-        // Final memory cleanup
-        if (global.gc) {
-          global.gc();
-        }
       }
     };
 
-    // Start processing
     processBatch();
   }
 
@@ -210,6 +303,10 @@ export class SimulationService {
     return this.activeSimulations.get(simulationId) || null;
   }
 
+  getSimulationLogsCSV(simulationId: string): string | null {
+    return this.logger.getLogsForSimulationAsCSV(simulationId);
+  }
+
   stopSimulation(simulationId: string): boolean {
     const status = this.activeSimulations.get(simulationId);
     if (!status || status.status !== 'running') {
@@ -218,8 +315,7 @@ export class SimulationService {
 
     status.status = 'completed';
     status.endTime = Date.now();
-    
-    // Clear timeout
+
     const timeout = this.simulationTimeouts.get(simulationId);
     if (timeout) {
       clearTimeout(timeout);
@@ -254,14 +350,22 @@ export class SimulationService {
     };
   }
 
-  // Cleanup completed simulations older than 1 hour
-  cleanup(): void {
-    const oneHourAgo = Date.now() - 60 * 60 * 1000;
-    
-    for (const [id, status] of this.activeSimulations.entries()) {
-      if (status.status !== 'running' && status.endTime && status.endTime < oneHourAgo) {
-        this.activeSimulations.delete(id);
-        console.log(`Cleaned up old simulation ${id}`);
+  cleanup(simulationId?: string): void {
+    if (simulationId) {
+      this.activeSimulations.delete(simulationId);
+      this.logger.cleanup(simulationId);
+      const timeout = this.simulationTimeouts.get(simulationId);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.simulationTimeouts.delete(simulationId);
+      }
+    } else {
+      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      for (const [id, status] of this.activeSimulations.entries()) {
+        if (status.status !== 'running' && status.endTime && status.endTime < oneHourAgo) {
+          this.activeSimulations.delete(id);
+          this.logger.cleanup(id);
+        }
       }
     }
   }
@@ -269,7 +373,6 @@ export class SimulationService {
 
 export const simulationService = new SimulationService();
 
-// Cleanup every 30 minutes
 setInterval(() => {
   simulationService.cleanup();
 }, 30 * 60 * 1000);

@@ -1,4 +1,4 @@
-import { CryptoOrder } from './types.js';
+import { CryptoOrder } from './trading.js';
 import { nanoid } from 'nanoid';
 
 export class ObjectPool<T> {
@@ -44,25 +44,25 @@ export const orderPool = new ObjectPool<CryptoOrder>(
     id: '',
     pair: '',
     side: 'buy',
-    price: 0,
-    amount: 0,
+    price: '0',
+    amount: '0',
     type: 'limit',
     timestamp: 0,
     userId: '',
     status: 'pending',
-    filledAmount: 0
+    filledAmount: '0'
   }),
   (order) => {
     order.id = '';
     order.pair = '';
     order.side = 'buy';
-    order.price = 0;
-    order.amount = 0;
+    order.price = '0';
+    order.amount = '0';
     order.type = 'limit';
     order.timestamp = 0;
     order.userId = '';
     order.status = 'pending';
-    order.filledAmount = 0;
+    order.filledAmount = '0';
   },
   10000 // Larger pool for simulation server
 );
@@ -74,23 +74,23 @@ export function createPooledOrder(
   pair: string,
   side: 'buy' | 'sell',
   type: 'market' | 'limit',
-  price: number,
-  amount: number,
+  price: string,
+  amount: string,
   userId: string
 ): CryptoOrder {
   const order = orderPool.acquire();
-  
+
   order.id = nanoid();
   order.pair = pair;
   order.side = side;
   order.type = type;
-  order.price = price;
-  order.amount = amount;
+  order.price = price.toString();
+  order.amount = amount.toString();
   order.timestamp = Date.now();
   order.userId = userId;
   order.status = 'pending';
-  order.filledAmount = 0;
-  
+  order.filledAmount = '0';
+
   return order;
 }
 

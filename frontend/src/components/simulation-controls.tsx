@@ -14,11 +14,15 @@ import { api, type PostApiSimulateResponse } from "../services/api";
 interface SimulationControlsProps {
 	selectedPair: string;
 	onSimulationStateChange?: (isSimulating: boolean) => void;
+	lastSimulationId: string | null;
+	setLastSimulationId: (id: string | null) => void;
 }
 
 export const SimulationControls: React.FC<SimulationControlsProps> = ({
 	selectedPair,
 	onSimulationStateChange,
+	lastSimulationId,
+	setLastSimulationId,
 }) => {
 	const [isSimulating, setIsSimulating] = useState(false);
 	const [ordersPerSecond, setOrdersPerSecond] = useState("1000");
@@ -65,8 +69,9 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 				parseInt(duration),
 				selectedPair
 			);
-
+			console.log("Simulation started:", response);
 			setMarketData(response.marketData);
+			setLastSimulationId(response.id || null);
 
 			// Auto-stop simulation after duration
 			setTimeout(() => {
@@ -83,6 +88,23 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 	const stopSimulation = () => {
 		setIsSimulating(false);
 		onSimulationStateChange?.(false);
+	};
+
+	const downloadLogs = async () => {
+		if (!lastSimulationId) return;
+
+		try {
+			const blob = await api.getSimulationLogs(lastSimulationId);
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `simulation-${lastSimulationId}-logs.csv`;
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+		} catch (error) {
+			console.error("Failed to download logs:", error);
+		}
 	};
 
 	return (
@@ -158,6 +180,11 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 								Stop
 							</Button>
 						)}
+						{!isSimulating && lastSimulationId && (
+							<Button onClick={downloadLogs} variant="secondary">
+								Download Log
+							</Button>
+						)}
 					</div>
 
 					{marketData && (
@@ -168,11 +195,15 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 							<div className="grid grid-cols-2 gap-2">
 								<div>
 									<span className="text-gray-400">Price:</span> $
-									{marketData.currentPrice ? parseFloat(marketData.currentPrice).toLocaleString() : 'N/A'}
+									{marketData.currentPrice
+										? parseFloat(marketData.currentPrice).toLocaleString()
+										: "N/A"}
 								</div>
 								<div>
 									<span className="text-gray-400">Spread:</span> $
-									{marketData.spread ? parseFloat(marketData.spread).toFixed(4) : 'N/A'}
+									{marketData.spread
+										? parseFloat(marketData.spread).toFixed(4)
+										: "N/A"}
 								</div>
 								<div>
 									<span className="text-gray-400">Volatility:</span>{" "}

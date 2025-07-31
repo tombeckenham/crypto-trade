@@ -25,6 +25,14 @@ CryptoTrade is a high-performance cryptocurrency trading system demonstrating ul
   - Performance metrics dashboard
   - Market depth charts using lightweight-charts
 
+### Simulation Server (Port varies)
+- **Framework**: Fastify with TypeScript
+- **Purpose**: High-volume crypto trading simulation server for generating market data and testing scenarios
+- **Key Components**:
+  - Market data generation with configurable volume
+  - Trading simulation with object pooling
+  - Performance logging and metrics
+
 ## Performance Requirements
 
 - Order processing: < 1ms average latency
@@ -95,10 +103,11 @@ CryptoTrade is a high-performance cryptocurrency trading system demonstrating ul
 ## Code Standards
 
 - TypeScript strict mode enabled
-- ESLint with performance-focused rules
+- ESLint with performance-focused rules (frontend), Vitest for testing (backend)
 - Clear separation of concerns
 - Performance-critical sections clearly marked
 - No comments unless specifically requested by user
+- Three-tier architecture: backend (trading engine), frontend (UI), simulation-server (data generation)
 
 ## TypeScript Guidelines
 
@@ -127,9 +136,37 @@ pnpm typecheck    # Run TypeScript type checking
 cd frontend
 pnpm install      # Install dependencies
 pnpm dev          # Run development server (port 5173)
-pnpm build        # Build for production
+pnpm build        # Build for production (includes typecheck)
 pnpm preview      # Preview production build
+pnpm lint         # Run ESLint
 ```
+
+### Simulation Server
+```bash
+cd simulation-server
+pnpm install      # Install dependencies
+pnpm dev          # Run development server with watch mode
+pnpm build        # Build for production
+pnpm start        # Run production server
+pnpm typecheck    # Run TypeScript type checking
+```
+
+## Testing
+
+### Backend Testing
+```bash
+cd backend
+pnpm test                    # Run all unit tests
+pnpm test:watch              # Run tests in watch mode
+pnpm test:ui                 # Run tests with UI interface
+pnpm test:coverage           # Run tests with coverage report
+pnpm test:performance        # Run performance benchmarks
+```
+
+### Test Structure
+- Unit tests: `src/**/*.test.ts`
+- Performance tests: `src/**/*.performance.test.ts`
+- Test configuration: `vitest.config.ts` (unit tests), `vitest.performance.config.ts` (performance tests)
 
 ## React Rules for Optimal Code Quality
 

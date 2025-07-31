@@ -2,19 +2,6 @@ export type OrderSide = 'buy' | 'sell';
 export type OrderType = 'market' | 'limit';
 export type OrderStatus = 'pending' | 'partial' | 'filled' | 'cancelled';
 
-export interface CryptoOrder {
-  id: string;
-  pair: string;
-  side: OrderSide;
-  price: number;
-  amount: number;
-  type: OrderType;
-  timestamp: number;
-  userId: string;
-  status: OrderStatus;
-  filledAmount: number;
-}
-
 export interface SimulationRequest {
   ordersPerSecond: number;
   durationSeconds: number;

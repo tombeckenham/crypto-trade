@@ -24,6 +24,10 @@ export type PostApiSimulateResponses = {
    */
   200: {
     /**
+     * Simulation ID
+     */
+    id?: string;
+    /**
      * Simulation status
      */
     message?: string;
@@ -161,5 +165,14 @@ export const api = {
       body: JSON.stringify(params)
     });
     return handleResponse(response);
+  },
+
+  async getSimulationLogs(simulationId: string): Promise<Blob> {
+    const response = await fetch(`${API_BASE_URL}/simulate/${simulationId}/logs`);
+    if (!response.ok) {
+      const error = await response.json() as ApiError;
+      throw new Error(error.error || 'API request failed');
+    }
+    return response.blob();
   }
 };

@@ -213,7 +213,6 @@ fastify.post<{ Body: SimulationRequest }>('/api/simulate', {
         type: 'object',
         properties: {
           id: { type: 'string', description: 'Simulation ID' },
-          status: { type: 'string', description: 'Initial status' },
           message: { type: 'string', description: 'Status message' },
           timestamp: { type: 'integer', description: 'Start timestamp' },
           serverInfo: {
@@ -273,13 +272,16 @@ fastify.post<{ Body: SimulationRequest }>('/api/simulate', {
       targetEndpoint
     });
 
+    const systemStats = simulationService.getSystemStats();
     return reply.send({
-      ...result,
+      id: result.simulationId,
+      message: result.message,
       timestamp: Date.now(),
       serverInfo: {
         service: 'cryptotrade-simulation-server',
         maxCapacity: '200K orders/sec',
-        ...simulationService.getSystemStats()
+        memoryUsage: systemStats.memoryUsage.heapUsed,
+        activeSimulations: systemStats.activeSimulations
       }
     });
 
@@ -383,6 +385,46 @@ fastify.post<{ Params: { id: string } }>('/api/simulate/:id/stop', {
   return reply.send({ message: 'Simulation stopped successfully' });
 });
 
+// Get simulation logs
+fastify.get<{ Params: { id: string } }>('/api/simulate/:id/logs', {
+  schema: {
+    tags: ['Simulation'],
+    summary: 'Get simulation logs',
+    description: 'Retrieve the logs of a simulation in CSV format',
+    params: {
+      type: 'object',
+      required: ['id'],
+      properties: {
+        id: { type: 'string', description: 'Simulation ID' }
+      }
+    },
+    response: {
+      200: {
+        type: 'string',
+        description: 'Simulation logs in CSV format'
+      },
+      404: {
+        type: 'object',
+        properties: {
+          error: { type: 'string', description: 'Error message' }
+        },
+        required: ['error']
+      }
+    }
+  }
+}, async (request, reply) => {
+  const { id } = request.params;
+  const logs = simulationService.getSimulationLogsCSV(id);
+
+  if (!logs) {
+    return reply.code(404).send({ error: 'Logs not found for this simulation' });
+  }
+
+  reply.header('Content-Type', 'text/csv');
+  reply.header('Content-Disposition', `attachment; filename=simulation-${id}-logs.csv`);
+  return reply.send(logs);
+});
+
 // List active simulations
 fastify.get('/api/simulate/active', {
   schema: {
@@ -464,10 +506,14 @@ fastify.get('/api/stats', {
     }
   }
 }, async () => {
+  const systemStats = simulationService.getSystemStats();
   return {
     timestamp: Date.now(),
     service: 'cryptotrade-simulation-server',
-    ...simulationService.getSystemStats()
+    memoryUsage: systemStats.memoryUsage.heapUsed,
+    activeSimulations: systemStats.activeSimulations,
+    totalSimulations: systemStats.totalSimulations,
+    uptime: systemStats.uptime
   };
 });
 
