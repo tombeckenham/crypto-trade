@@ -33,8 +33,8 @@ describe('WebSocket Service Tests', () => {
 
   const createTestOrder = (
     side: 'buy' | 'sell',
-    price: number,
-    amount: number,
+    price: string,
+    amount: string,
     pair: string = 'BTC-USDT'
   ): CryptoOrder => ({
     id: faker.string.nanoid(),
@@ -46,7 +46,7 @@ describe('WebSocket Service Tests', () => {
     timestamp: Date.now(),
     userId: faker.string.uuid(),
     status: 'pending',
-    filledAmount: 0
+    filledAmount: "0"
   });
 
 
@@ -290,8 +290,8 @@ describe('WebSocket Service Tests', () => {
       // ws2 doesn't subscribe
 
       // Create orders that will generate a trade
-      const sellOrder = createTestOrder('sell', 50000, 1.0);
-      const buyOrder = createTestOrder('buy', 50000, 1.0);
+      const sellOrder = createTestOrder('sell', "50000", "1.0");
+      const buyOrder = createTestOrder('buy', "50000", "1.0");
 
       matchingEngine.submitOrder(sellOrder);
       matchingEngine.submitOrder(buyOrder); // This should create a trade
@@ -303,8 +303,8 @@ describe('WebSocket Service Tests', () => {
       expect(tradeMessage.data).toBeDefined();
       expect(Array.isArray(tradeMessage.data)).toBe(true);
       expect(tradeMessage.data.length).toBeGreaterThan(0);
-      expect(tradeMessage.data[0].price).toBe(50000);
-      expect(tradeMessage.data[0].amount).toBe(1.0);
+      expect(tradeMessage.data[0].price).toBe("50000");
+      expect(tradeMessage.data[0].amount).toBe("1");
 
       // ws2 should not receive anything (not subscribed)
       // We can't easily test negative case without complex timing

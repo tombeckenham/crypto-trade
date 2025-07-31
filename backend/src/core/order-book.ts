@@ -1,5 +1,6 @@
 import { RedBlackTree } from './red-black-tree.js';
 import { CryptoOrder, OrderBookLevel, MarketDepth, OrderSide } from '../types/trading.js';
+import { addStrings, subtractStrings, numberToString } from '../utils/precision.js';
 
 /**
  * High-performance order book implementation for cryptocurrency trading
@@ -33,20 +34,24 @@ export class OrderBook {
     }
 
     const tree = order.side === 'buy' ? this.bids : this.asks;
-    let level = tree.find(order.price);
+    const priceNum = parseFloat(order.price);
+    let level = tree.find(priceNum);
 
     if (!level) {
       level = {
         price: order.price,
-        amount: 0,
-        total: 0,
+        amount: '0',
+        total: '0',
         orders: []
       };
-      tree.insert(order.price, level);
+      tree.insert(priceNum, level);
     }
 
     level.orders.push(order);
-    level.amount += order.amount - order.filledAmount;
+    const orderAmount = parseFloat(order.amount);
+    const filledAmount = parseFloat(order.filledAmount);
+    const amountToAdd = numberToString(orderAmount - filledAmount);
+    level.amount = addStrings(level.amount, amountToAdd);
     this.orderMap.set(order.id, order);
     this.lastUpdateTime = Date.now();
   }
@@ -56,16 +61,20 @@ export class OrderBook {
     if (!order) return null;
 
     const tree = order.side === 'buy' ? this.bids : this.asks;
-    const level = tree.find(order.price);
+    const priceNum = parseFloat(order.price);
+    const level = tree.find(priceNum);
 
     if (level) {
       const orderIndex = level.orders.findIndex(o => o.id === orderId);
       if (orderIndex !== -1) {
         level.orders.splice(orderIndex, 1);
-        level.amount -= (order.amount - order.filledAmount);
+        const orderAmount = parseFloat(order.amount);
+        const filledAmount = parseFloat(order.filledAmount);
+        const amountToSubtract = numberToString(orderAmount - filledAmount);
+        level.amount = subtractStrings(level.amount, amountToSubtract);
 
         if (level.orders.length === 0) {
-          tree.remove(order.price);
+          tree.remove(priceNum);
         }
       }
     }
@@ -75,23 +84,30 @@ export class OrderBook {
     return order;
   }
 
-  updateOrderAmount(orderId: string, filledAmount: number): void {
+  updateOrderAmount(orderId: string, filledAmount: string): void {
     const order = this.orderMap.get(orderId);
     if (!order) return;
 
     const tree = order.side === 'buy' ? this.bids : this.asks;
-    const level = tree.find(order.price);
+    const priceNum = parseFloat(order.price);
+    const level = tree.find(priceNum);
 
     if (level) {
-      const previousUnfilled = order.amount - order.filledAmount;
+      const orderAmountNum = parseFloat(order.amount);
+      const previousFilledNum = parseFloat(order.filledAmount);
+      const newFilledNum = parseFloat(filledAmount);
+      
+      const previousUnfilled = orderAmountNum - previousFilledNum;
       order.filledAmount = filledAmount;
-      const newUnfilled = order.amount - order.filledAmount;
-      level.amount += newUnfilled - previousUnfilled;
+      const newUnfilled = orderAmountNum - newFilledNum;
+      
+      const amountChange = numberToString(newUnfilled - previousUnfilled);
+      level.amount = addStrings(level.amount, amountChange);
 
-      if (order.filledAmount >= order.amount) {
+      if (newFilledNum >= orderAmountNum) {
         order.status = 'filled';
         this.removeOrder(orderId);
-      } else if (order.filledAmount > 0) {
+      } else if (newFilledNum > 0) {
         order.status = 'partial';
       }
     }
@@ -111,12 +127,14 @@ export class OrderBook {
     return best ? best.value : null;
   }
 
-  getSpread(): number {
+  getSpread(): string {
     const bestBid = this.getBestBid();
     const bestAsk = this.getBestAsk();
 
-    if (!bestBid || !bestAsk) return Infinity;
-    return bestAsk.price - bestBid.price;
+    if (!bestBid || !bestAsk) return 'Infinity';
+    const bidPrice = parseFloat(bestBid.price);
+    const askPrice = parseFloat(bestAsk.price);
+    return numberToString(askPrice - bidPrice);
   }
 
   getMarketDepth(maxLevels: number = 10): MarketDepth {
@@ -127,11 +145,11 @@ export class OrderBook {
     let cumulativeBidAmount = 0;
     for (const { value } of this.bids.inOrderTraversal()) {
       if (count >= maxLevels) break;
-      cumulativeBidAmount += value.amount;
+      cumulativeBidAmount += parseFloat(value.amount);
       bids.push({
         price: value.price,
         amount: value.amount,
-        total: cumulativeBidAmount,
+        total: numberToString(cumulativeBidAmount),
         orders: [...value.orders]
       });
       count++;
@@ -141,11 +159,11 @@ export class OrderBook {
     let cumulativeAskAmount = 0;
     for (const { value } of this.asks.inOrderTraversal()) {
       if (count >= maxLevels) break;
-      cumulativeAskAmount += value.amount;
+      cumulativeAskAmount += parseFloat(value.amount);
       asks.push({
         price: value.price,
         amount: value.amount,
-        total: cumulativeAskAmount,
+        total: numberToString(cumulativeAskAmount),
         orders: [...value.orders]
       });
       count++;
@@ -167,15 +185,15 @@ export class OrderBook {
     return this.orderMap.size;
   }
 
-  getTotalVolume(side: OrderSide): number {
+  getTotalVolume(side: OrderSide): string {
     const tree = side === 'buy' ? this.bids : this.asks;
     let totalVolume = 0;
 
     for (const { value } of tree.inOrderTraversal()) {
-      totalVolume += value.amount;
+      totalVolume += parseFloat(value.amount);
     }
 
-    return totalVolume;
+    return numberToString(totalVolume);
   }
 
   clear(): void {

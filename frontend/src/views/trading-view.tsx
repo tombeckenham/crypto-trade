@@ -72,11 +72,11 @@ export const TradingView: React.FC = () => {
 		if (connectionStatus !== "connected") return;
 
 		const handleOrderBookUpdate = (data: MarketDepth) => {
-			console.log('Order book update received:', data);
+			console.log("Order book update received:", data);
 			setWsOrderBook(data);
 		};
 
-		console.log('Setting up WebSocket subscription for:', selectedPair);
+		console.log("Setting up WebSocket subscription for:", selectedPair);
 		wsService.subscribe("orderbook", selectedPair, handleOrderBookUpdate);
 
 		return () => {
@@ -85,14 +85,6 @@ export const TradingView: React.FC = () => {
 	}, [selectedPair, connectionStatus]);
 
 	const currentOrderBook = wsOrderBook || orderBook;
-	
-	console.log('Current state:', {
-		connectionStatus,
-		selectedPair,
-		wsOrderBookExists: !!wsOrderBook,
-		restOrderBookExists: !!orderBook,
-		currentOrderBookExists: !!currentOrderBook
-	});
 
 	return (
 		<div className="flex flex-col bg-background text-foreground dark">

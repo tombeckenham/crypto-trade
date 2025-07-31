@@ -6,35 +6,35 @@ export interface CryptoOrder {
   id: string;
   pair: string; // e.g., BTC-USDT, ETH-USDT
   side: OrderSide;
-  price: number;
-  amount: number; // Amount in base currency (e.g., BTC amount)
+  price: string;
+  amount: string; // Amount in base currency (e.g., BTC amount)
   type: OrderType;
   timestamp: number;
   userId: string;
   status: OrderStatus;
-  filledAmount: number;
-  fee?: number;
+  filledAmount: string;
+  fee?: string;
   feeAsset?: string;
 }
 
 export interface CryptoTrade {
   id: string;
   pair: string;
-  price: number;
-  amount: number;
-  volume: number; // price * amount (in quote currency)
+  price: string;
+  amount: string;
+  volume: string; // price * amount (in quote currency)
   timestamp: number;
   takerSide: OrderSide;
   buyOrderId: string;
   sellOrderId: string;
-  makerFee: number;
-  takerFee: number;
+  makerFee: string;
+  takerFee: string;
 }
 
 export interface OrderBookLevel {
-  price: number;
-  amount: number;
-  total: number; // Cumulative amount
+  price: string;
+  amount: string;
+  total: string; // Cumulative amount
   orders: CryptoOrder[];
 }
 
@@ -47,15 +47,15 @@ export interface MarketDepth {
 
 export interface Ticker {
   pair: string;
-  lastPrice: number;
-  bidPrice: number;
-  askPrice: number;
-  openPrice: number;
-  highPrice: number;
-  lowPrice: number;
-  volume24h: number;
-  quoteVolume24h: number;
-  priceChange24h: number;
-  priceChangePercent24h: number;
+  lastPrice: string;
+  bidPrice: string;
+  askPrice: string;
+  openPrice: string;
+  highPrice: string;
+  lowPrice: string;
+  volume24h: string;
+  quoteVolume24h: string;
+  priceChange24h: string;
+  priceChangePercent24h: string;
   timestamp: number;
 }

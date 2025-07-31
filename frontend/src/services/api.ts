@@ -3,12 +3,13 @@ import type { CryptoTrade, MarketDepth, TradingPair } from "../types/trading";
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const API_KEY = import.meta.env.VITE_API_KEY;
 
+console.log('API_KEY', API_KEY)
 export interface PlaceOrderRequest {
   pair: string;
   side: 'buy' | 'sell';
   type: 'market' | 'limit';
-  price?: number;
-  amount: number;
+  price?: string;
+  amount: string;
   userId: string;
 }
 
@@ -85,7 +86,7 @@ export const api = {
   async placeOrder(order: PlaceOrderRequest) {
     const response = await fetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'X-API-Key': API_KEY
       },

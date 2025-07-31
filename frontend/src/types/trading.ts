@@ -6,31 +6,31 @@ export interface CryptoOrder {
   id: string;
   pair: string;
   side: OrderSide;
-  price: number;
-  amount: number;
+  price: string;
+  amount: string;
   type: OrderType;
   timestamp: number;
   userId: string;
   status: OrderStatus;
-  filledAmount: number;
-  fee?: number;
+  filledAmount: string;
+  fee?: string;
   feeAsset?: string;
 }
 
 export interface CryptoTrade {
   id: string;
   pair: string;
-  price: number;
-  amount: number;
-  volume: number;
+  price: string;
+  amount: string;
+  volume: string;
   timestamp: number;
   takerSide: OrderSide;
 }
 
 export interface OrderBookLevel {
-  price: number;
-  amount: number;
-  total: number;
+  price: string;
+  amount: string;
+  total: string;
 }
 
 export interface MarketDepth {
@@ -42,16 +42,16 @@ export interface MarketDepth {
 
 export interface Ticker {
   pair: string;
-  lastPrice: number;
-  bidPrice: number;
-  askPrice: number;
-  openPrice: number;
-  highPrice: number;
-  lowPrice: number;
-  volume24h: number;
-  quoteVolume24h: number;
-  priceChange24h: number;
-  priceChangePercent24h: number;
+  lastPrice: string;
+  bidPrice: string;
+  askPrice: string;
+  openPrice: string;
+  highPrice: string;
+  lowPrice: string;
+  volume24h: string;
+  quoteVolume24h: string;
+  priceChange24h: string;
+  priceChangePercent24h: string;
   timestamp: number;
 }
 

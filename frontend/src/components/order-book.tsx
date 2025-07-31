@@ -11,22 +11,23 @@ interface OrderBookProps {
 
 export const OrderBook: React.FC<OrderBookProps> = ({ bids, asks, pair, maxLevels = 15 }) => {
   // Filter out invalid levels and calculate maxTotal safely
-  const validBids = bids.filter(b => b && typeof b.total === 'number' && !isNaN(b.total));
-  const validAsks = asks.filter(a => a && typeof a.total === 'number' && !isNaN(a.total));
+  const validBids = bids.filter(b => b && typeof b.total === 'string' && !isNaN(parseFloat(b.total)));
+  const validAsks = asks.filter(a => a && typeof a.total === 'string' && !isNaN(parseFloat(a.total)));
   
   const maxTotal = Math.max(
     0,
-    ...validBids.map(b => b.total),
-    ...validAsks.map(a => a.total)
+    ...validBids.map(b => parseFloat(b.total)),
+    ...validAsks.map(a => parseFloat(a.total))
   );
 
   const renderLevel = (level: OrderBookLevel, type: 'bid' | 'ask') => {
     // Skip invalid levels with null/undefined values
-    if (!level || typeof level.price !== 'number' || typeof level.amount !== 'number' || typeof level.total !== 'number') {
+    if (!level || typeof level.price !== 'string' || typeof level.amount !== 'string' || typeof level.total !== 'string') {
       return null;
     }
     
-    const percentage = maxTotal > 0 ? (level.total / maxTotal) * 100 : 0;
+    const totalNum = parseFloat(level.total);
+    const percentage = maxTotal > 0 ? (totalNum / maxTotal) * 100 : 0;
     const isAsk = type === 'ask';
     
     return (
@@ -39,10 +40,10 @@ export const OrderBook: React.FC<OrderBookProps> = ({ bids, asks, pair, maxLevel
         />
         <div className="flex-1 flex justify-between px-2 py-0.5 z-10 relative">
           <span className={isAsk ? 'text-red-500' : 'text-green-500'}>
-            {level.price.toFixed(2)}
+            {parseFloat(level.price).toFixed(2)}
           </span>
-          <span>{level.amount.toFixed(6)}</span>
-          <span className="opacity-70">{level.total.toFixed(6)}</span>
+          <span>{parseFloat(level.amount).toFixed(6)}</span>
+          <span className="opacity-70">{parseFloat(level.total).toFixed(6)}</span>
         </div>
       </div>
     );
@@ -70,8 +71,10 @@ export const OrderBook: React.FC<OrderBookProps> = ({ bids, asks, pair, maxLevel
             Spread: {(() => {
               const bestAsk = validAsks[0]?.price;
               const bestBid = validBids[0]?.price;
-              if (typeof bestAsk === 'number' && typeof bestBid === 'number') {
-                return (bestAsk - bestBid).toFixed(2);
+              if (typeof bestAsk === 'string' && typeof bestBid === 'string') {
+                const askNum = parseFloat(bestAsk);
+                const bidNum = parseFloat(bestBid);
+                return (askNum - bidNum).toFixed(2);
               }
               return 'N/A';
             })()}

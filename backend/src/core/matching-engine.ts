@@ -3,6 +3,7 @@ import { OrderBook } from './order-book.js';
 import { CryptoOrder, CryptoTrade } from '../types/trading.js';
 import { nanoid } from 'nanoid';
 import { orderPool } from '../utils/object-pool.js';
+import { addStrings, multiplyStrings, numberToString } from '../utils/precision.js';
 
 /**
  * Event interface defining all events emitted by the MatchingEngine
@@ -118,7 +119,7 @@ export class MatchingEngine extends EventEmitter {
     }
 
     // Reject zero-amount orders
-    if (order.amount <= 0) {
+    if (parseFloat(order.amount) <= 0) {
       order.status = 'cancelled';
       this.emit('orderUpdate', order);
       return;
@@ -176,7 +177,7 @@ export class MatchingEngine extends EventEmitter {
    */
   private executeMarketOrder(order: CryptoOrder, orderBook: OrderBook): void {
     const isBuy = order.side === 'buy';            // Direction determines which side to match against
-    let remainingAmount = order.amount;            // Track unfilled portion
+    let remainingAmount = parseFloat(order.amount); // Track unfilled portion
     let totalVolume = 0;                          // Accumulate total trade volume for metrics
 
     // Continue matching until order is fully filled or no liquidity remains
@@ -193,21 +194,24 @@ export class MatchingEngine extends EventEmitter {
       const counterOrder = bestLevel.orders[0]!;
       
       // Calculate trade amount - limited by smaller of remaining amounts
+      const counterAmountNum = parseFloat(counterOrder.amount);
+      const counterFilledNum = parseFloat(counterOrder.filledAmount);
       const matchAmount = Math.min(
         remainingAmount,                                    // What we still need
-        counterOrder.amount - counterOrder.filledAmount    // What's available in counter order
+        counterAmountNum - counterFilledNum                // What's available in counter order
       );
 
       if (matchAmount > 0) {
-        const volume = matchAmount * bestLevel.price;
+        const priceNum = parseFloat(bestLevel.price);
+        const volume = matchAmount * priceNum;
         totalVolume += volume;
         
-        this.createTrade(order, counterOrder, bestLevel.price, matchAmount, volume);
+        this.createTrade(order, counterOrder, bestLevel.price, numberToString(matchAmount), numberToString(volume));
         
-        order.filledAmount += matchAmount;
+        order.filledAmount = addStrings(order.filledAmount, numberToString(matchAmount));
         remainingAmount -= matchAmount;
         
-        orderBook.updateOrderAmount(counterOrder.id, counterOrder.filledAmount + matchAmount);
+        orderBook.updateOrderAmount(counterOrder.id, addStrings(counterOrder.filledAmount, numberToString(matchAmount)));
         
         this.emit('orderUpdate', order);
         this.emit('orderUpdate', counterOrder);
@@ -215,9 +219,11 @@ export class MatchingEngine extends EventEmitter {
     }
 
     // Determine final order status based on fill amount
-    if (order.filledAmount >= order.amount) {
+    const orderAmountNum = parseFloat(order.amount);
+    const orderFilledNumFinal = parseFloat(order.filledAmount);
+    if (orderFilledNumFinal >= orderAmountNum) {
       order.status = 'filled';      // Completely executed
-    } else if (order.filledAmount > 0) {
+    } else if (orderFilledNumFinal > 0) {
       order.status = 'partial';     // Partially executed (ran out of liquidity)
     } else {
       order.status = 'cancelled';   // No execution possible (no liquidity)
@@ -243,7 +249,9 @@ export class MatchingEngine extends EventEmitter {
    */
   private executeLimitOrder(order: CryptoOrder, orderBook: OrderBook): void {
     const isBuy = order.side === 'buy';                      // Direction for price comparison logic
-    let remainingAmount = order.amount - order.filledAmount; // Handle partial fills from previous attempts
+    const orderAmountNum = parseFloat(order.amount);
+    const orderFilledNum = parseFloat(order.filledAmount);
+    let remainingAmount = orderAmountNum - orderFilledNum;   // Handle partial fills from previous attempts
     let totalVolume = 0;                                    // Track total volume for metrics
 
     // Attempt to match against existing orders while price conditions are met
@@ -257,9 +265,11 @@ export class MatchingEngine extends EventEmitter {
       }
 
       // Check if limit price allows matching at this level
+      const bestLevelPriceNum = parseFloat(bestLevel.price);
+      const orderPriceNum = parseFloat(order.price);
       const canMatch = isBuy
-        ? bestLevel.price <= order.price    // Buy order: can match if ask price <= our bid
-        : bestLevel.price >= order.price;   // Sell order: can match if bid price >= our ask
+        ? bestLevelPriceNum <= orderPriceNum    // Buy order: can match if ask price <= our bid
+        : bestLevelPriceNum >= orderPriceNum;   // Sell order: can match if bid price >= our ask
 
       // Stop matching if price constraint violated
       if (!canMatch) {
@@ -267,31 +277,36 @@ export class MatchingEngine extends EventEmitter {
       }
 
       const counterOrder = bestLevel.orders[0]!;
+      const counterAmountNum = parseFloat(counterOrder.amount);
+      const counterFilledNum = parseFloat(counterOrder.filledAmount);
       const matchAmount = Math.min(
         remainingAmount,
-        counterOrder.amount - counterOrder.filledAmount
+        counterAmountNum - counterFilledNum
       );
 
       if (matchAmount > 0) {
-        const volume = matchAmount * bestLevel.price;
+        const priceNum = parseFloat(bestLevel.price);
+        const volume = matchAmount * priceNum;
         totalVolume += volume;
         
-        this.createTrade(order, counterOrder, bestLevel.price, matchAmount, volume);
+        this.createTrade(order, counterOrder, bestLevel.price, numberToString(matchAmount), numberToString(volume));
         
-        order.filledAmount += matchAmount;
+        order.filledAmount = addStrings(order.filledAmount, numberToString(matchAmount));
         remainingAmount -= matchAmount;
         
-        orderBook.updateOrderAmount(counterOrder.id, counterOrder.filledAmount + matchAmount);
+        orderBook.updateOrderAmount(counterOrder.id, addStrings(counterOrder.filledAmount, numberToString(matchAmount)));
         
         this.emit('orderUpdate', order);
         this.emit('orderUpdate', counterOrder);
       }
     }
 
-    if (order.filledAmount >= order.amount) {
+    const finalAmountNum = parseFloat(order.amount);
+    const finalFilledNum = parseFloat(order.filledAmount);
+    if (finalFilledNum >= finalAmountNum) {
       order.status = 'filled';
     } else {
-      if (order.filledAmount > 0) {
+      if (finalFilledNum > 0) {
         order.status = 'partial';
       }
       orderBook.addOrder(order);
@@ -315,9 +330,9 @@ export class MatchingEngine extends EventEmitter {
   private createTrade(
     takerOrder: CryptoOrder,
     makerOrder: CryptoOrder,
-    price: number,
-    amount: number,
-    volume: number
+    price: string,
+    amount: string,
+    volume: string
   ): void {
     // Build comprehensive trade record with all execution details
     const trade: CryptoTrade = {
@@ -334,8 +349,8 @@ export class MatchingEngine extends EventEmitter {
       sellOrderId: takerOrder.side === 'sell' ? takerOrder.id : makerOrder.id,
       
       // Fee calculations based on volume
-      makerFee: volume * this.makerFeeRate,    // Lower fee for liquidity provider
-      takerFee: volume * this.takerFeeRate     // Higher fee for liquidity consumer
+      makerFee: multiplyStrings(volume, numberToString(this.makerFeeRate)),    // Lower fee for liquidity provider
+      takerFee: multiplyStrings(volume, numberToString(this.takerFeeRate))     // Higher fee for liquidity consumer
     };
 
     // Increment sequence counter for trade ordering

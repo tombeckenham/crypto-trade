@@ -10,8 +10,8 @@ describe('MatchingEngine', () => {
   // Helper function to create test orders
   const createOrder = (
     side: OrderSide,
-    price: number,
-    amount: number,
+    price: string,
+    amount: string,
     type: 'market' | 'limit' = 'limit',
     id?: string
   ): CryptoOrder => ({
@@ -24,7 +24,7 @@ describe('MatchingEngine', () => {
     timestamp: Date.now(),
     userId: faker.string.uuid(),
     status: 'pending',
-    filledAmount: 0
+    filledAmount: "0"
   });
 
   beforeEach(() => {
@@ -63,8 +63,8 @@ describe('MatchingEngine', () => {
 
     it('should provide market depth', () => {
       // Add some orders to create depth
-      engine.submitOrder(createOrder('buy', 50000, 1.0));
-      engine.submitOrder(createOrder('sell', 51000, 1.0));
+      engine.submitOrder(createOrder('buy', "50000", "1.0"));
+      engine.submitOrder(createOrder('sell', "51000", "1.0"));
 
       const depth = engine.getMarketDepth(testPair, 5);
       expect(depth).toBeDefined();
@@ -74,36 +74,36 @@ describe('MatchingEngine', () => {
     });
 
     it('should provide order book statistics', () => {
-      engine.submitOrder(createOrder('buy', 50000, 1.0));
-      engine.submitOrder(createOrder('sell', 51000, 1.0));
+      engine.submitOrder(createOrder('buy', "50000", "1.0"));
+      engine.submitOrder(createOrder('sell', "51000", "1.0"));
 
       const stats = engine.getOrderBookStats(testPair);
       expect(stats.pair).toBe(testPair);
       expect(stats.bestBid).toBeDefined();
       expect(stats.bestAsk).toBeDefined();
-      expect(stats.spread).toBe(1000);
-      expect(stats.bidVolume).toBe(1.0);
-      expect(stats.askVolume).toBe(1.0);
+      expect(stats.spread).toBe("1000");
+      expect(stats.bidVolume).toBe("1");
+      expect(stats.askVolume).toBe("1");
       expect(stats.orderCount).toBe(2);
     });
   });
 
   describe('Limit Order Processing', () => {
     it('should add limit order to book when no match', () => {
-      const buyOrder = createOrder('buy', 50000, 1.0);
+      const buyOrder = createOrder('buy', "50000", "1.0");
 
       engine.submitOrder(buyOrder);
 
       const orderBook = engine.getOrderBook(testPair);
       expect(orderBook.getOrderCount()).toBe(1);
-      expect(orderBook.getBestBid()!.price).toBe(50000);
+      expect(orderBook.getBestBid()!.price).toBe("50000");
     });
 
     it('should emit orderUpdate event for new limit order', () => {
       const orderUpdateSpy = vi.fn();
       engine.on('orderUpdate', orderUpdateSpy);
 
-      const order = createOrder('buy', 50000, 1.0);
+      const order = createOrder('buy', "50000", "1.0");
       engine.submitOrder(order);
 
       expect(orderUpdateSpy).toHaveBeenCalledWith(
@@ -122,11 +122,11 @@ describe('MatchingEngine', () => {
       engine.on('orderUpdate', orderUpdateSpy);
 
       // Add a sell order first
-      const sellOrder = createOrder('sell', 50000, 1.0);
+      const sellOrder = createOrder('sell', "50000", "1.0");
       engine.submitOrder(sellOrder);
 
       // Add a buy order that matches
-      const buyOrder = createOrder('buy', 50000, 0.5);
+      const buyOrder = createOrder('buy', "50000", "0.5");
       engine.submitOrder(buyOrder);
 
       // Should generate a trade
@@ -134,12 +134,12 @@ describe('MatchingEngine', () => {
       const trade = tradeSpy.mock.calls[0]![0] as CryptoTrade;
 
       expect(trade.pair).toBe(testPair);
-      expect(trade.price).toBe(50000);
-      expect(trade.amount).toBe(0.5);
-      expect(trade.volume).toBe(25000); // 50000 * 0.5
+      expect(trade.price).toBe("50000");
+      expect(trade.amount).toBe("0.5");
+      expect(trade.volume).toBe("25000"); // 50000 * 0.5
       expect(trade.takerSide).toBe('buy');
-      expect(trade.makerFee).toBe(25); // 25000 * 0.001
-      expect(trade.takerFee).toBe(50); // 25000 * 0.002
+      expect(trade.makerFee).toBe("25"); // 25000 * 0.001
+      expect(trade.takerFee).toBe("50"); // 25000 * 0.002
 
       // Both orders should be updated
       expect(orderUpdateSpy).toHaveBeenCalledTimes(4); // 2 for initial placement, 2 for matching
@@ -150,11 +150,11 @@ describe('MatchingEngine', () => {
       engine.on('trade', tradeSpy);
 
       // Large sell order
-      const sellOrder = createOrder('sell', 50000, 2.0);
+      const sellOrder = createOrder('sell', "50000", "2.0");
       engine.submitOrder(sellOrder);
 
       // Smaller buy order
-      const buyOrder = createOrder('buy', 50000, 0.8);
+      const buyOrder = createOrder('buy', "50000", "0.8");
       engine.submitOrder(buyOrder);
 
       expect(tradeSpy).toHaveBeenCalledTimes(1);
@@ -163,7 +163,7 @@ describe('MatchingEngine', () => {
       const bestAsk = orderBook.getBestAsk();
 
       // Sell order should be partially filled
-      expect(bestAsk!.amount).toBe(1.2); // 2.0 - 0.8
+      expect(bestAsk!.amount).toBe("1.2"); // 2.0 - 0.8
       expect(orderBook.getOrder(buyOrder.id)).toBe(undefined); // Buy order fully filled
     });
 
@@ -172,12 +172,12 @@ describe('MatchingEngine', () => {
       engine.on('trade', tradeSpy);
 
       // Add multiple small sell orders at same price
-      engine.submitOrder(createOrder('sell', 50000, 0.3, 'limit', 'sell1'));
-      engine.submitOrder(createOrder('sell', 50000, 0.2, 'limit', 'sell2'));
-      engine.submitOrder(createOrder('sell', 50000, 0.5, 'limit', 'sell3'));
+      engine.submitOrder(createOrder('sell', "50000", "0.3", 'limit', 'sell1'));
+      engine.submitOrder(createOrder('sell', "50000", "0.2", 'limit', 'sell2'));
+      engine.submitOrder(createOrder('sell', "50000", "0.5", 'limit', 'sell3'));
 
       // Large buy order that matches all
-      const buyOrder = createOrder('buy', 50000, 0.8);
+      const buyOrder = createOrder('buy', "50000", "0.8");
       engine.submitOrder(buyOrder);
 
       // Should generate multiple trades
@@ -191,14 +191,14 @@ describe('MatchingEngine', () => {
       const tradeSpy = vi.fn();
       engine.on('trade', tradeSpy);
 
-      engine.submitOrder(createOrder('sell', 51000, 1.0));
-      engine.submitOrder(createOrder('buy', 50000, 1.0));
+      engine.submitOrder(createOrder('sell', "51000", "1.0"));
+      engine.submitOrder(createOrder('buy', "50000", "1.0"));
 
       expect(tradeSpy).not.toHaveBeenCalled();
 
       const orderBook = engine.getOrderBook(testPair);
       expect(orderBook.getOrderCount()).toBe(2);
-      expect(orderBook.getSpread()).toBe(1000);
+      expect(orderBook.getSpread()).toBe("1000");
     });
   });
 
@@ -207,13 +207,13 @@ describe('MatchingEngine', () => {
 
     beforeEach(() => {
       // Set up a basic order book with liquidity
-      engine.submitOrder(createOrder('sell', 50100, 0.5));
-      engine.submitOrder(createOrder('sell', 50200, 1.0));
-      engine.submitOrder(createOrder('sell', 50300, 1.5));
+      engine.submitOrder(createOrder('sell', "50100", "0.5"));
+      engine.submitOrder(createOrder('sell', "50200", "1.0"));
+      engine.submitOrder(createOrder('sell', "50300", "1.5"));
 
-      engine.submitOrder(createOrder('buy', 49900, 0.8));
-      engine.submitOrder(createOrder('buy', 49800, 1.2));
-      engine.submitOrder(createOrder('buy', 49700, 2.0));
+      engine.submitOrder(createOrder('buy', "49900", "0.8"));
+      engine.submitOrder(createOrder('buy', "49800", "1.2"));
+      engine.submitOrder(createOrder('buy', "49700", "2.0"));
 
       // Set up the spy after liquidity is added to avoid counting setup trades
       tradeSpy = vi.fn();
@@ -221,52 +221,52 @@ describe('MatchingEngine', () => {
     });
 
     it('should execute market buy order against best asks', () => {
-      const marketBuy = createOrder('buy', 0, 0.7, 'market'); // Price ignored for market orders
+      const marketBuy = createOrder('buy', "0", "0.7", 'market'); // Price ignored for market orders
       engine.submitOrder(marketBuy);
 
       expect(tradeSpy).toHaveBeenCalledTimes(2);
 
       // First trade at best ask level (50100 for 0.5)
       const trade1 = tradeSpy.mock.calls[0]![0] as CryptoTrade;
-      expect(trade1.price).toBe(50100);
-      expect(trade1.amount).toBe(0.5);
+      expect(trade1.price).toBe("50100");
+      expect(trade1.amount).toBe("0.5");
       expect(trade1.takerSide).toBe('buy');
 
       // Second trade at next level (50200 for remaining 0.2)
       const trade2 = tradeSpy.mock.calls[1]![0] as CryptoTrade;
-      expect(trade2.price).toBe(50200);
-      expect(trade2.amount).toBeCloseTo(0.2, 10);
+      expect(trade2.price).toBe("50200");
+      expect(trade2.amount).toBeCloseTo("0.2", 10);
       expect(trade2.takerSide).toBe('buy');
     });
 
     it('should execute market sell order against best bids', () => {
-      const marketSell = createOrder('sell', 0, 0.6, 'market');
+      const marketSell = createOrder('sell', "0", "0.6", 'market');
       engine.submitOrder(marketSell);
 
       expect(tradeSpy).toHaveBeenCalledTimes(1);
 
       const trade = tradeSpy.mock.calls[0]![0] as CryptoTrade;
-      expect(trade.price).toBe(49900); // Should match against best bid
-      expect(trade.amount).toBe(0.6);
+      expect(trade.price).toBe("49900"); // Should match against best bid
+      expect(trade.amount).toBe("0.6");
       expect(trade.takerSide).toBe('sell');
     });
 
     it('should walk through price levels for large market orders', () => {
       // Market buy that exceeds first level
-      const marketBuy = createOrder('buy', 0, 1.2, 'market');
+      const marketBuy = createOrder('buy', "0", "1.2", 'market');
       engine.submitOrder(marketBuy);
 
       expect(tradeSpy).toHaveBeenCalledTimes(2);
 
       // First trade at 50100 for 0.5
       const trade1 = tradeSpy.mock.calls[0]![0] as CryptoTrade;
-      expect(trade1.price).toBe(50100);
-      expect(trade1.amount).toBe(0.5);
+      expect(trade1.price).toBe("50100");
+      expect(trade1.amount).toBe("0.5");
 
       // Second trade at 50200 for 0.7 (remaining)
       const trade2 = tradeSpy.mock.calls[1]![0] as CryptoTrade;
-      expect(trade2.price).toBe(50200);
-      expect(trade2.amount).toBe(0.7);
+      expect(trade2.price).toBe("50200");
+      expect(trade2.amount).toBe("0.7");
     });
 
     it('should partially fill market order when insufficient liquidity', () => {
@@ -274,7 +274,7 @@ describe('MatchingEngine', () => {
       engine.on('orderUpdate', orderUpdateSpy);
 
       // Market buy larger than all available liquidity
-      const marketBuy = createOrder('buy', 0, 10.0, 'market');
+      const marketBuy = createOrder('buy', "0", "10.0", 'market');
       engine.submitOrder(marketBuy);
 
       // Should be partially filled
@@ -293,7 +293,7 @@ describe('MatchingEngine', () => {
       const orderUpdateSpy = vi.fn();
       engine.on('orderUpdate', orderUpdateSpy);
 
-      const marketBuy = createOrder('buy', 0, 1.0, 'market');
+      const marketBuy = createOrder('buy', "0", "1.0", 'market');
       engine.submitOrder(marketBuy);
 
       // Should be cancelled due to no liquidity
@@ -309,7 +309,7 @@ describe('MatchingEngine', () => {
       const cancelledSpy = vi.fn();
       engine.on('orderCancelled', cancelledSpy);
 
-      const order = createOrder('buy', 50000, 1.0);
+      const order = createOrder('buy', "50000", "1.0");
       engine.submitOrder(order);
 
       const result = engine.cancelOrder(order.id, testPair);
@@ -347,15 +347,15 @@ describe('MatchingEngine', () => {
       const customEngine = new MatchingEngine(0.01, 0.02); // 1% maker, 2% taker
       customEngine.on('trade', tradeSpy);
 
-      customEngine.submitOrder(createOrder('sell', 100, 1.0));
-      customEngine.submitOrder(createOrder('buy', 100, 1.0));
+      customEngine.submitOrder(createOrder('sell', "100", "1.0"));
+      customEngine.submitOrder(createOrder('buy', "100", "1.0"));
 
       expect(tradeSpy).toHaveBeenCalledTimes(1);
       const trade = tradeSpy.mock.calls[0]![0] as CryptoTrade;
 
-      expect(trade.volume).toBe(100); // 100 * 1.0
-      expect(trade.makerFee).toBe(1); // 100 * 0.01
-      expect(trade.takerFee).toBe(2); // 100 * 0.02
+      expect(trade.volume).toBe("100"); // 100 * 1.0
+      expect(trade.makerFee).toBe("1"); // 100 * 0.01
+      expect(trade.takerFee).toBe("2"); // 100 * 0.02
     });
   });
 
@@ -367,8 +367,8 @@ describe('MatchingEngine', () => {
       engine.on('trade', tradeSpy);
       engine.on('orderUpdate', orderUpdateSpy);
 
-      const sellOrder = createOrder('sell', 50000, 1.0);
-      const buyOrder = createOrder('buy', 50000, 1.0);
+      const sellOrder = createOrder('sell', "50000", "1.0");
+      const buyOrder = createOrder('buy', "50000", "1.0");
 
       engine.submitOrder(sellOrder);
       engine.submitOrder(buyOrder);
@@ -383,9 +383,9 @@ describe('MatchingEngine', () => {
       const trade = tradeSpy.mock.calls[0]![0] as CryptoTrade;
       expect(trade.id).toBeDefined();
       expect(trade.pair).toBe(testPair);
-      expect(trade.price).toBe(50000);
-      expect(trade.amount).toBe(1.0);
-      expect(trade.volume).toBe(50000);
+      expect(trade.price).toBe("50000");
+      expect(trade.amount).toBe("1");
+      expect(trade.volume).toBe("50000");
       expect(trade.timestamp).toBeGreaterThan(0);
       expect(trade.buyOrderId).toBeDefined();
       expect(trade.sellOrderId).toBeDefined();
@@ -398,8 +398,8 @@ describe('MatchingEngine', () => {
       engine.on('trade', tradeSpy1);
       engine.on('trade', tradeSpy2);
 
-      engine.submitOrder(createOrder('sell', 50000, 1.0));
-      engine.submitOrder(createOrder('buy', 50000, 1.0));
+      engine.submitOrder(createOrder('sell', "50000", "1.0"));
+      engine.submitOrder(createOrder('buy', "50000", "1.0"));
 
       expect(tradeSpy1).toHaveBeenCalledTimes(1);
       expect(tradeSpy2).toHaveBeenCalledTimes(1);
@@ -417,7 +417,7 @@ describe('MatchingEngine', () => {
         const price = basePrice + (i % 100) * 10;
         const amount = Math.random() * 2 + 0.1;
 
-        engine.submitOrder(createOrder(side, price, amount));
+        engine.submitOrder(createOrder(side, price.toString(), amount.toString()));
       }
 
       const duration = Date.now() - startTime;
@@ -430,8 +430,8 @@ describe('MatchingEngine', () => {
     it('should handle rapid matching efficiently', () => {
       // Set up order book with many levels
       for (let i = 1; i <= 100; i++) {
-        engine.submitOrder(createOrder('sell', 50000 + i * 10, 0.1));
-        engine.submitOrder(createOrder('buy', 50000 - i * 10, 0.1));
+        engine.submitOrder(createOrder('sell', (50000 + i * 10).toString(), "0.1"));
+        engine.submitOrder(createOrder('buy', (50000 - i * 10).toString(), "0.1"));
       }
 
       const tradeSpy = vi.fn();
@@ -441,8 +441,8 @@ describe('MatchingEngine', () => {
 
       // Submit market orders that will match many levels
       for (let i = 0; i < 10; i++) {
-        engine.submitOrder(createOrder('buy', 0, 5.0, 'market'));
-        engine.submitOrder(createOrder('sell', 0, 5.0, 'market'));
+        engine.submitOrder(createOrder('buy', "0", "5.0", 'market'));
+        engine.submitOrder(createOrder('sell', "0", "5.0", 'market'));
       }
 
       const duration = Date.now() - startTime;
@@ -462,11 +462,11 @@ describe('MatchingEngine', () => {
       engine.on('trade', tradeSpy);
 
       // Add liquidity on other side
-      engine.submitOrder(createOrder('sell', price, totalAmount));
+      engine.submitOrder(createOrder('sell', price.toString(), totalAmount.toString()));
 
       // Submit order in chunks
       for (let i = 0; i < totalAmount / chunkSize; i++) {
-        engine.submitOrder(createOrder('buy', price, chunkSize));
+        engine.submitOrder(createOrder('buy', price.toString(), chunkSize.toString()));
       }
 
       expect(tradeSpy).toHaveBeenCalledTimes(10); // Should generate 10 trades
@@ -480,18 +480,18 @@ describe('MatchingEngine', () => {
       engine.on('trade', tradeSpy);
 
       // Add orders at different price levels
-      engine.submitOrder(createOrder('sell', 50100, 1.0));
-      engine.submitOrder(createOrder('sell', 50200, 1.0));
+      engine.submitOrder(createOrder('sell', "50100", "1.0"));
+      engine.submitOrder(createOrder('sell', "50200", "1.0"));
 
       // Buy order with higher price should get price improvement
-      engine.submitOrder(createOrder('buy', 50200, 1.0));
+      engine.submitOrder(createOrder('buy', "50200", "1.0"));
 
       expect(tradeSpy).toHaveBeenCalledTimes(1);
       const trade = tradeSpy.mock.calls[0]![0] as CryptoTrade;
 
       // Should execute at better price (50100, not 50200)
-      expect(trade.price).toBe(50100);
-      expect(trade.amount).toBe(1.0);
+      expect(trade.price).toBe("50100");
+      expect(trade.amount).toBe("1");
     });
 
     it('should maintain FIFO order within price levels', () => {
@@ -499,9 +499,9 @@ describe('MatchingEngine', () => {
       engine.on('trade', tradeSpy);
 
       // Add multiple orders at same price level
-      const order1 = createOrder('sell', 50000, 1.0, 'limit', 'first');
-      const order2 = createOrder('sell', 50000, 1.0, 'limit', 'second');
-      const order3 = createOrder('sell', 50000, 1.0, 'limit', 'third');
+      const order1 = createOrder('sell', "50000", "1.0", 'limit', 'first');
+      const order2 = createOrder('sell', "50000", "1.0", 'limit', 'second');
+      const order3 = createOrder('sell', "50000", "1.0", 'limit', 'third');
 
       engine.submitOrder(order1);
       // Small delay to ensure different timestamps
@@ -511,7 +511,7 @@ describe('MatchingEngine', () => {
       // Wait for all orders to be submitted
       setTimeout(() => {
         // Market buy should match first order first
-        engine.submitOrder(createOrder('buy', 50000, 0.5));
+        engine.submitOrder(createOrder('buy', "50000", "0.5"));
 
         expect(tradeSpy).toHaveBeenCalledTimes(1);
         const trade = tradeSpy.mock.calls[0]![0] as CryptoTrade;
@@ -529,7 +529,7 @@ describe('MatchingEngine', () => {
       const orderUpdateSpy = vi.fn();
       engine.on('orderUpdate', orderUpdateSpy);
 
-      const order = createOrder('buy', 50000, 0);
+      const order = createOrder('buy', "50000", "0");
       engine.submitOrder(order);
 
       expect(orderUpdateSpy).toHaveBeenCalledWith(
@@ -548,22 +548,22 @@ describe('MatchingEngine', () => {
       engine.on('trade', tradeSpy);
 
       const smallAmount = 0.00000001;
-      engine.submitOrder(createOrder('sell', 50000, smallAmount));
-      engine.submitOrder(createOrder('buy', 50000, smallAmount));
+      engine.submitOrder(createOrder('sell', "50000", smallAmount.toString()));
+      engine.submitOrder(createOrder('buy', "50000", smallAmount.toString()));
 
       expect(tradeSpy).toHaveBeenCalledTimes(1);
       const trade = tradeSpy.mock.calls[0]![0] as CryptoTrade;
-      expect(trade.amount).toBe(smallAmount);
+      expect(trade.amount).toBe(smallAmount.toFixed(8));
     });
 
     it('should handle very large amounts', () => {
-      const largeAmount = 1000000;
-      const order = createOrder('buy', 50000, largeAmount);
+      const largeAmount = 1000000.0;
+      const order = createOrder('buy', "50000", largeAmount.toString());
 
       expect(() => engine.submitOrder(order)).not.toThrow();
 
       const orderBook = engine.getOrderBook(testPair);
-      expect(orderBook.getBestBid()!.amount).toBe(largeAmount);
+      expect(orderBook.getBestBid()!.amount).toBe(largeAmount.toString());
     });
   });
 });

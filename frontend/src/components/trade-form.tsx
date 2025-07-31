@@ -41,7 +41,7 @@ const formReducer = (state: FormState, action: FormAction): FormState => {
 			}
 			return state;
 		case "RESET":
-			return { side: "buy", type: "limit", price: "", amount: "" };
+			return { side: "buy", type: "market", price: "", amount: "" };
 		default:
 			return state;
 	}
@@ -54,7 +54,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 }) => {
 	const [state, dispatch] = useReducer(formReducer, {
 		side: "buy",
-		type: "limit",
+		type: "market",
 		price: "",
 		amount: "",
 	});
@@ -62,15 +62,18 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
 
-		const amount = parseFloat(state.amount);
-		const price = state.type === "limit" ? parseFloat(state.price) : undefined;
+		const amountNum = parseFloat(state.amount);
+		const priceNum = state.type === "limit" ? parseFloat(state.price) : 0;
 
-		if (!state.amount || isNaN(amount) || amount <= 0) {
+		if (!state.amount || isNaN(amountNum) || amountNum <= 0) {
 			alert("Please enter a valid amount");
 			return;
 		}
 
-		if (state.type === "limit" && (!state.price || !price || isNaN(price) || price <= 0)) {
+		if (
+			state.type === "limit" &&
+			(!state.price || isNaN(priceNum) || priceNum <= 0)
+		) {
 			alert("Please enter a valid price");
 			return;
 		}
@@ -79,8 +82,8 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 			pair,
 			side: state.side,
 			type: state.type,
-			price,
-			amount,
+			price: state.type === "limit" ? state.price : undefined,
+			amount: state.amount,
 			userId,
 		});
 
@@ -116,16 +119,6 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 					<div className="flex gap-2">
 						<Button
 							type="button"
-							variant={state.type === "limit" ? "secondary" : "outline"}
-							className="flex-1"
-							onClick={() =>
-								dispatch({ type: "SET_ORDER_TYPE", orderType: "limit" })
-							}
-						>
-							Limit
-						</Button>
-						<Button
-							type="button"
 							variant={state.type === "market" ? "secondary" : "outline"}
 							className="flex-1"
 							onClick={() =>
@@ -133,6 +126,16 @@ export const TradeForm: React.FC<TradeFormProps> = ({
 							}
 						>
 							Market
+						</Button>
+						<Button
+							type="button"
+							variant={state.type === "limit" ? "secondary" : "outline"}
+							className="flex-1"
+							onClick={() =>
+								dispatch({ type: "SET_ORDER_TYPE", orderType: "limit" })
+							}
+						>
+							Limit
 						</Button>
 					</div>
 

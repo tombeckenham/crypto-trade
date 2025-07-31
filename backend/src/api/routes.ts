@@ -5,13 +5,14 @@ import { nanoid } from 'nanoid';
 import { marketDataService } from '../services/market-data-service.js';
 import { createPooledOrder, releaseOrder, orderPool } from '../utils/object-pool.js';
 import { simulationClient } from '../services/simulation-client.js';
+import { numberToString } from '../utils/precision.js';
 
 interface PlaceOrderBody {
   pair: string;
   side: 'buy' | 'sell';
   type: 'market' | 'limit';
-  price?: number;
-  amount: number;
+  price?: string;
+  amount: string;
   userId: string;
 }
 
@@ -67,21 +68,21 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
       pair: { type: 'string', description: 'Trading pair symbol' },
       side: { type: 'string', enum: ['buy', 'sell'], description: 'Order side' },
       type: { type: 'string', enum: ['market', 'limit'], description: 'Order type' },
-      price: { type: 'number', description: 'Order price (0 for market orders)' },
-      amount: { type: 'number', description: 'Order amount in base currency' },
+      price: { type: 'string', description: 'Order price (0 for market orders)' },
+      amount: { type: 'string', description: 'Order amount in base currency' },
       timestamp: { type: 'number', description: 'Order creation timestamp' },
       userId: { type: 'string', description: 'User identifier' },
       status: { type: 'string', enum: ['pending', 'partial', 'filled', 'cancelled'] },
-      filledAmount: { type: 'number', description: 'Amount filled so far' }
+      filledAmount: { type: 'string', description: 'Amount filled so far' }
     }
   };
 
   const orderBookLevelSchema = {
     type: 'object',
     properties: {
-      price: { type: 'number', description: 'Price level' },
-      amount: { type: 'number', description: 'Total amount at this price' },
-      total: { type: 'number', description: 'Cumulative amount' },
+      price: { type: 'string', description: 'Price level' },
+      amount: { type: 'string', description: 'Total amount at this price' },
+      total: { type: 'string', description: 'Cumulative amount' },
       orders: { type: 'array', items: orderSchema, description: 'Orders at this level' }
     }
   };
@@ -118,8 +119,8 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
           pair: { type: 'string', description: 'Trading pair symbol' },
           side: { type: 'string', enum: ['buy', 'sell'], description: 'Order side' },
           type: { type: 'string', enum: ['market', 'limit'], description: 'Order type' },
-          price: { type: 'number', description: 'Order price (required for limit orders)' },
-          amount: { type: 'number', description: 'Order amount in base currency' },
+          price: { type: 'string', description: 'Order price (required for limit orders)' },
+          amount: { type: 'string', description: 'Order amount in base currency' },
           userId: { type: 'string', description: 'User identifier' }
         }
       },
@@ -146,12 +147,12 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
       pair,
       side,
       type,
-      price: price || 0,
+      price: price || '0',
       amount,
       timestamp: Date.now(),
       userId,
       status: 'pending',
-      filledAmount: 0
+      filledAmount: '0'
     };
 
     try {
@@ -343,9 +344,18 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     }
   }, async (_request, reply) => {
     const pairs = matchingEngine.getSupportedPairs();
-    const stats = pairs.map(pair => ({
-      ...matchingEngine.getOrderBookStats(pair)
-    }));
+    const stats = pairs.map(pair => {
+      const orderBookStats = matchingEngine.getOrderBookStats(pair);
+      return {
+        pair: orderBookStats.pair,
+        bestBid: orderBookStats.bestBid,
+        bestAsk: orderBookStats.bestAsk,
+        spread: orderBookStats.spread,
+        bidVolume: orderBookStats.bidVolume,
+        askVolume: orderBookStats.askVolume,
+        orderCount: orderBookStats.orderCount
+      };
+    });
 
     return reply.send({
       timestamp: Date.now(),
@@ -439,10 +449,10 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
               type: 'object',
               properties: {
                 symbol: { type: 'string', description: 'Trading symbol' },
-                currentPrice: { type: 'number', description: 'Current market price' },
-                spread: { type: 'number', description: 'Bid-ask spread' },
+                currentPrice: { type: 'string', description: 'Current market price' },
+                spread: { type: 'string', description: 'Bid-ask spread' },
                 volatility: { type: 'string', description: 'Market volatility percentage' },
-                avgOrderSize: { type: 'number', description: 'Average order size' },
+                avgOrderSize: { type: 'string', description: 'Average order size' },
                 marketOrderRatio: { type: 'string', description: 'Market order ratio percentage' }
               }
             },
@@ -562,8 +572,8 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
           pair,
           isBuy ? 'buy' : 'sell',
           isMarketOrder ? 'market' : 'limit',
-          orderPrice,
-          orderSize,
+          numberToString(orderPrice),
+          numberToString(orderSize),
           `sim-user-${Math.floor(Math.random() * 1000)}`
         );
 
@@ -591,7 +601,9 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
         // Update current price based on order book mid-price
         const stats = matchingEngine.getOrderBookStats(pair);
         if (stats.bestBid && stats.bestAsk) {
-          const midPrice = (stats.bestBid.price + stats.bestAsk.price) / 2;
+          const bidPriceNum = parseFloat(stats.bestBid.price);
+          const askPriceNum = parseFloat(stats.bestAsk.price);
+          const midPrice = (bidPriceNum + askPriceNum) / 2;
           // Smooth price updates to prevent wild swings
           currentPrice = currentPrice * 0.9 + midPrice * 0.1;
         }
@@ -660,10 +672,10 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
       message: 'Simulation started with real market data',
       marketData: {
         symbol: marketPrice.symbol,
-        currentPrice: marketPrice.price,
-        spread: params.spread,
+        currentPrice: numberToString(marketPrice.price),
+        spread: numberToString(params.spread),
         volatility: (params.volatility * 100).toFixed(2) + '%',
-        avgOrderSize: params.avgOrderSize,
+        avgOrderSize: numberToString(params.avgOrderSize),
         marketOrderRatio: (params.marketOrderRatio * 100).toFixed(1) + '%'
       },
       parameters: {

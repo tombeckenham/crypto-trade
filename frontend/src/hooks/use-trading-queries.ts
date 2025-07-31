@@ -8,7 +8,7 @@ export const useOrderBook = (pair: string, levels: number = 20) => {
   return useQuery<MarketDepth>({
     queryKey: ['orderbook', pair, levels],
     queryFn: () => api.getOrderBook(pair, levels),
-    refetchInterval: 2000,
+    refetchInterval: 20_000,
     staleTime: 30_000 // We have websocket, so we don't need to refetch
   });
 };

@@ -24,10 +24,11 @@ async function start() {
     console.log('Starting CryptoTrade backend...');
 
     await server.register(cors, {
-      origin: [
-        'http://localhost:5173', // Local development
+      origin: process.env['NODE_ENV'] === 'production' ? [
         'https://cryptotrade-frontend-production.up.railway.app', // Production frontend
         /^https:\/\/cryptotrade-frontend-.*\.up\.railway\.app$/ // Railway preview deployments
+      ] : [
+        'http://localhost:5173', // Local development
       ],
       credentials: true
     });
