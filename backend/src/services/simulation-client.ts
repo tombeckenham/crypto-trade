@@ -114,10 +114,13 @@ export class SimulationClient {
     }
 
     try {
+      console.info('Simulation SIMULATION_SERVER_URL:', process.env['SIMULATION_SERVER_URL']);
+
       const response = await fetch(`${this.simulationServerUrl}/health`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000) // 5 second timeout
       });
+      console.info('Simulation server health check response:', response);
       return response.ok;
     } catch (error) {
       this.log?.warn('Simulation server health check failed:', error);
