@@ -65,7 +65,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     }
 
     const cancelled = matchingEngine.cancelOrder(id, pair);
-    
+
     if (cancelled) {
       return reply.send({ message: 'Order cancelled successfully' });
     } else {
@@ -76,7 +76,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
   fastify.get<{ Params: OrderBookParams }>('/api/orderbook/:pair', async (request, reply) => {
     const { pair } = request.params;
     const levels = parseInt((request.query as any).levels as string) || 20;
-    
+
     try {
       const depth = matchingEngine.getMarketDepth(pair, levels);
       return reply.send(depth);
@@ -87,7 +87,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
 
   fastify.get<{ Params: TradesParams }>('/api/trades/:pair', async (request, reply) => {
     const { pair } = request.params;
-    
+
     return reply.send({
       pair,
       trades: [],
@@ -97,7 +97,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
 
   fastify.get('/api/portfolio', async (request, reply) => {
     const userId = (request.query as any).userId as string;
-    
+
     if (!userId) {
       return reply.code(400).send({ error: 'userId is required' });
     }
@@ -137,14 +137,14 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     return reply.status(200).send({
       status: 'ok',
       timestamp: Date.now(),
-      service: 'fluxtrade-backend',
+      service: 'cryptotrade-backend',
       version: '1.0.0'
     });
   });
 
   fastify.post('/api/simulate', async (request, reply) => {
     const { ordersPerSecond = 1000, durationSeconds = 10, pair = 'BTC-USDT', forceLocal = false } = request.body as any;
-    
+
     if (ordersPerSecond > 100000) {
       return reply.code(400).send({ error: 'Maximum 100,000 orders per second supported' });
     }
@@ -182,35 +182,35 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
       console.error('Error generating order parameters:', error);
       return reply.code(500).send({ error: 'Invalid market data received' });
     }
-    
+
     let orderCount = 0;
     let tradeCount = 0;
     const startTime = Date.now();
     const targetOrders = ordersPerSecond * durationSeconds;
-    
+
     // Smaller batches for high volumes to prevent memory spikes
     const batchSize = Math.min(100, Math.max(10, ordersPerSecond / 50));
     const batchDelay = (1000 / ordersPerSecond) * batchSize;
 
     let currentPrice = params.basePrice;
     const priceHistory: number[] = [currentPrice];
-    
+
     // Memory monitoring
     let lastMemoryCheck = Date.now();
     const processedOrders = new Set<string>(); // Track processed orders for cleanup
 
     const simulateOrderBatch = () => {
       const batch: CryptoOrder[] = [];
-      
+
       for (let i = 0; i < batchSize && orderCount < targetOrders; i++) {
         const isMarketOrder = Math.random() < params.marketOrderRatio;
         const isBuy = Math.random() < 0.5;
-        
+
         // Price variation based on market volatility
         const volatilityFactor = params.volatility * (Math.random() - 0.5) * 2;
         const meanReversion = (params.basePrice - currentPrice) * 0.1; // Slight mean reversion
         const priceChange = currentPrice * (volatilityFactor * 0.1 + meanReversion * 0.01);
-        
+
         let orderPrice: number;
         if (isMarketOrder) {
           orderPrice = 0;
@@ -234,7 +234,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
           // Large orders (5%)
           orderSize = params.avgOrderSize * (5 + Math.random() * 20);
         }
-        
+
         // Use object pool for memory efficiency
         const order = createPooledOrder(
           pair,
@@ -255,7 +255,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
         batch.forEach(order => {
           matchingEngine.submitOrder(order);
         });
-        
+
         // Memory management - release processed orders back to pool
         setTimeout(() => {
           batch.forEach(order => {
@@ -265,7 +265,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
             }
           });
         }, 1000); // Clean up after 1 second
-        
+
         // Update current price based on order book mid-price
         const stats = matchingEngine.getOrderBookStats(pair);
         if (stats.bestBid && stats.bestAsk) {
@@ -273,12 +273,12 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
           // Smooth price updates to prevent wild swings
           currentPrice = currentPrice * 0.9 + midPrice * 0.1;
         }
-        
+
         priceHistory.push(currentPrice);
         if (priceHistory.length > 100) {
           priceHistory.shift(); // Keep last 100 price points
         }
-        
+
         // Memory monitoring every 5 seconds
         const now = Date.now();
         if (now - lastMemoryCheck > 5000) {
@@ -286,14 +286,14 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
           const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
           const poolSize = orderPool.getPoolSize();
           console.log(`Memory: ${heapUsedMB}MB heap, ${poolSize} pooled orders, ${processedOrders.size} active`);
-          
+
           if (heapUsedMB > 3500) { // Warning at 3.5GB
             console.warn('High memory usage detected, triggering GC');
             if (global.gc) {
               global.gc();
             }
           }
-          
+
           lastMemoryCheck = now;
         }
       });
@@ -306,19 +306,19 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
         const actualOrdersPerSecond = orderCount / duration;
         const finalPrice = priceHistory[priceHistory.length - 1] || params.basePrice;
         const priceChange = ((finalPrice - params.basePrice) / params.basePrice) * 100;
-        
+
         console.log(`Simulation completed: ${orderCount} orders in ${duration}s (${actualOrdersPerSecond.toFixed(0)} orders/sec)`);
         console.log(`Price moved from $${params.basePrice.toFixed(2)} to $${finalPrice.toFixed(2)} (${priceChange.toFixed(2)}%)`);
-        
+
         // Final cleanup - release any remaining orders
         setTimeout(() => {
           // Clear processed orders set
           processedOrders.clear();
-          
+
           const finalMemUsage = process.memoryUsage();
           const finalHeapMB = Math.round(finalMemUsage.heapUsed / 1024 / 1024);
           console.log(`Final memory usage: ${finalHeapMB}MB heap, ${orderPool.getPoolSize()} pooled orders`);
-          
+
           if (global.gc) {
             global.gc();
             console.log('Final garbage collection triggered');
@@ -360,7 +360,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     return reply.send({
       timestamp: Date.now(),
       engine: stats,
-      pairs: matchingEngine.getSupportedPairs().map(pair => 
+      pairs: matchingEngine.getSupportedPairs().map(pair =>
         matchingEngine.getOrderBookStats(pair)
       )
     });

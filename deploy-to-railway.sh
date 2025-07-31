@@ -26,6 +26,12 @@ if ! railway whoami &> /dev/null; then
     exit 1
 fi
 
+# Check if we're linked to a project, if not initialize one
+if ! railway status &> /dev/null; then
+    echo -e "${YELLOW}🔗 No project linked. Creating new project...${NC}"
+    railway init cryptotrade
+fi
+
 echo -e "${BLUE}📦 Building and deploying services...${NC}"
 
 # Deploy Backend
@@ -36,11 +42,8 @@ pnpm install
 pnpm build
 
 # Create or link backend service
-echo "   - Deploying to Railway..."
-if ! railway status &> /dev/null; then
-    echo "   - Creating new backend service..."
-    railway service create cryptotrade-backend
-fi
+echo "   - Creating backend service..."
+railway add --service cryptotrade-backend
 
 railway up
 BACKEND_URL=$(railway domain)
@@ -55,8 +58,7 @@ pnpm build
 
 # Create simulation service
 echo "   - Creating simulation service..."
-railway service create cryptotrade-simulation
-railway link cryptotrade-simulation
+railway add --service cryptotrade-simulation
 
 # Set environment variables for simulation server
 echo "   - Setting environment variables..."
@@ -86,8 +88,7 @@ cd ../frontend
 
 # Create frontend service
 echo "   - Creating frontend service..."
-railway service create cryptotrade-frontend
-railway link cryptotrade-frontend
+railway add --service cryptotrade-frontend
 
 # Set frontend environment variables
 echo "   - Setting environment variables..."

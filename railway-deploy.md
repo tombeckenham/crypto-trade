@@ -3,23 +3,27 @@
 ## Services to Deploy
 
 ### 1. Main Trading Server (Backend)
+
 - **Directory**: `backend/`
 - **Port**: 3001
-- **Service Name**: `fluxtrade-backend`
+- **Service Name**: `cryptotrade-backend`
 
 ### 2. Simulation Server
+
 - **Directory**: `simulation-server/`
-- **Port**: 3002  
-- **Service Name**: `fluxtrade-simulation`
+- **Port**: 3002
+- **Service Name**: `cryptotrade-simulation`
 
 ### 3. Frontend
+
 - **Directory**: `frontend/`
 - **Port**: 5173
-- **Service Name**: `fluxtrade-frontend`
+- **Service Name**: `cryptotrade-frontend`
 
 ## Railway Configuration Steps
 
 ### Step 1: Deploy Main Backend
+
 ```bash
 cd backend
 railway login
@@ -28,49 +32,54 @@ railway up
 ```
 
 ### Step 2: Deploy Simulation Server
+
 ```bash
 cd ../simulation-server
 railway login
 # Create new service
-railway service create fluxtrade-simulation
-railway link fluxtrade-simulation
+railway service create cryptotrade-simulation
+railway link cryptotrade-simulation
 railway up
 ```
 
 ### Step 3: Deploy Frontend
+
 ```bash
 cd ../frontend
 railway login
-railway service create fluxtrade-frontend
-railway link fluxtrade-frontend
+railway service create cryptotrade-frontend
+railway link cryptotrade-frontend
 railway up
 ```
 
 ## Environment Variables Configuration
 
 ### Main Backend Service Variables
+
 ```env
 NODE_ENV=production
 PORT=3001
-SIMULATION_SERVER_URL=https://fluxtrade-simulation.railway.app
-PUBLIC_URL=https://fluxtrade-backend.railway.app
+SIMULATION_SERVER_URL=https://cryptotrade-simulation.railway.app
+PUBLIC_URL=https://cryptotrade-backend.railway.app
 NODE_OPTIONS="--max-old-space-size=4096 --expose-gc"
 ```
 
 ### Simulation Server Variables
+
 ```env
 NODE_ENV=production
 PORT=3002
-MAIN_SERVER_URL=https://fluxtrade-backend.railway.app
+MAIN_SERVER_URL=https://cryptotrade-backend.railway.app
 NODE_OPTIONS="--max-old-space-size=2048 --expose-gc"
 LOG_LEVEL=info
 UV_THREADPOOL_SIZE=16
 ```
 
 ### Frontend Variables
+
 ```env
-VITE_API_URL=https://fluxtrade-backend.railway.app/api
-VITE_WS_URL=wss://fluxtrade-backend.railway.app
+VITE_API_URL=https://cryptotrade-backend.railway.app/api
+VITE_WS_URL=wss://cryptotrade-backend.railway.app
 ```
 
 ## Service Communication Flow
