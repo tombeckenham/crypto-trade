@@ -168,7 +168,10 @@ fastify.get('/health', {
     status: 'ok',
     service: 'cryptotrade-simulation-server',
     timestamp: Date.now(),
-    ...systemStats
+    memoryUsage: systemStats.memoryUsage.heapUsed,
+    activeSimulations: systemStats.activeSimulations,
+    totalSimulations: systemStats.totalSimulations,
+    uptime: systemStats.uptime
   };
 });
 
