@@ -1,13 +1,39 @@
 import { type MarketDepth } from "../types/trading.js";
 
-type MessageHandler = (data: MarketDepth) => void;
+interface EngineMetrics {
+	orderCount: number;
+	tradeCount: number;
+	ordersMatched: number;
+	ordersLast10s: number;
+	ordersLast1m: number;
+	ordersLast1h: number;
+	tradesLast10s: number;
+	tradesLast1m: number;
+	tradesLast1h: number;
+	ordersPerSecond10s: number;
+	ordersPerSecond1m: number;
+	tradesPerSecond10s: number;
+	tradesPerSecond1m: number;
+	matchEfficiency: number;
+	supportedPairs: number;
+	poolSize: number;
+	memoryUsage: {
+		heapUsed: number;
+		heapTotal: number;
+	};
+	timestamp: number;
+}
+
+type MarketDataHandler = (data: MarketDepth) => void;
+type MetricsHandler = (data: EngineMetrics) => void;
 
 export class WebSocketService {
   private ws: WebSocket | null = null;
   private url: string;
   private reconnectTimeout: number = 5000;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private handlers: Map<string, Set<MessageHandler>> = new Map();
+  private handlers: Map<string, Set<MarketDataHandler>> = new Map();
+  private metricsHandlers: Set<MetricsHandler> = new Set();
   private subscriptions: Map<string, Set<string>> = new Map();
   private isConnecting: boolean = false;
   private shouldReconnect: boolean = true;
@@ -95,7 +121,7 @@ export class WebSocketService {
     }
   }
 
-  subscribe(channel: string, pair: string, handler: MessageHandler): void {
+  subscribe(channel: string, pair: string, handler: MarketDataHandler): void {
     const key = `${channel}:${pair}`;
     console.log(`Subscribing to ${key}`);
 
@@ -118,8 +144,49 @@ export class WebSocketService {
       });
     }
   }
+  
+  subscribeToMetrics(handler: MetricsHandler): void {
+    console.log('Subscribing to metrics');
+    this.metricsHandlers.add(handler);
 
-  unsubscribe(channel: string, pair: string, handler: MessageHandler): void {
+    if (!this.subscriptions.has('metrics')) {
+      this.subscriptions.set('metrics', new Set());
+    }
+    this.subscriptions.get('metrics')!.add('global');
+
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      console.log('Sending metrics subscription message');
+      this.send({
+        type: 'subscribe',
+        channel: 'metrics',
+        pair: 'global'
+      });
+    }
+  }
+  
+  unsubscribeFromMetrics(handler: MetricsHandler): void {
+    this.metricsHandlers.delete(handler);
+
+    if (this.metricsHandlers.size === 0) {
+      const subs = this.subscriptions.get('metrics');
+      if (subs) {
+        subs.delete('global');
+        if (subs.size === 0) {
+          this.subscriptions.delete('metrics');
+        }
+      }
+
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.send({
+          type: 'unsubscribe',
+          channel: 'metrics',
+          pair: 'global'
+        });
+      }
+    }
+  }
+
+  unsubscribe(channel: string, pair: string, handler: MarketDataHandler): void {
     const key = `${channel}:${pair}`;
     const handlers = this.handlers.get(key);
 
@@ -155,10 +222,11 @@ export class WebSocketService {
         const key = `${message.type === 'orderbook' ? 'orderbook' : 'trades'}:${message.pair}`;
         const handlers = this.handlers.get(key);
 
-
         if (handlers) {
           handlers.forEach(handler => handler(message.data));
         }
+      } else if (message.type === 'metrics') {
+        this.metricsHandlers.forEach(handler => handler(message.data));
       }
     } catch (error) {
       console.error('Failed to parse WebSocket message:', error);

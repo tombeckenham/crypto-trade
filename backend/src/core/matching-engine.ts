@@ -46,6 +46,17 @@ export class MatchingEngine extends EventEmitter {
   private readonly maxOrdersPerSecond: number = 50000; // Circuit breaker limit
   private readonly memoryCheckInterval: number = 5000;  // Check memory every 5 seconds
   private recentOrderTimestamps: number[] = [];        // For rate limiting
+  
+  // Enhanced metrics tracking - optimized circular buffers for performance
+  private readonly orderTimestamps: number[] = new Array(3600).fill(0); // Last hour of orders (circular buffer)
+  private readonly tradeTimestamps: number[] = new Array(3600).fill(0); // Last hour of trades (circular buffer)
+  private orderIndex: number = 0;                      // Circular buffer index for orders
+  private tradeIndex: number = 0;                      // Circular buffer index for trades
+  private ordersMatched: number = 0;                   // Total orders that resulted in trades
+  private metricsCalculationCache: {                   // Cache expensive calculations
+    lastCalculated: number;
+    data: any;
+  } | null = null;
 
   /**
    * Creates a new matching engine with configurable fee structure
@@ -144,13 +155,25 @@ export class MatchingEngine extends EventEmitter {
     }
 
     this.orderCount++;
+    
+    // Track order timestamp in circular buffer for time-windowed metrics
+    const now = Date.now();
+    this.orderTimestamps[this.orderIndex] = now;
+    this.orderIndex = (this.orderIndex + 1) % this.orderTimestamps.length;
+    
     const orderBook = this.getOrCreateOrderBook(order.pair);
+    const initialTradeCount = this.tradeCount; // Track if this order generates trades
 
     // Route to specific execution logic based on order type
     if (order.type === 'market') {
       this.executeMarketOrder(order, orderBook);  // Execute immediately at market prices
     } else {
       this.executeLimitOrder(order, orderBook);   // Execute with price constraints
+    }
+    
+    // Track if this order resulted in trades (match efficiency)
+    if (this.tradeCount > initialTradeCount) {
+      this.ordersMatched++;
     }
 
     // Clean up processed orders periodically
@@ -304,6 +327,7 @@ export class MatchingEngine extends EventEmitter {
 
       if (matchAmount > 0) {
         const priceNum = parseFloat(bestLevel.price);
+        // Not loving the floating point math here... Might want to switch to using BigNumber if doing this for real
         const volume = matchAmount * priceNum;
         totalVolume += volume;
 
@@ -374,6 +398,10 @@ export class MatchingEngine extends EventEmitter {
     // Increment sequence counter for trade ordering
     this.tradeSequence++;
     this.tradeCount++;
+    
+    // Track trade timestamp in circular buffer for time-windowed metrics
+    this.tradeTimestamps[this.tradeIndex] = trade.timestamp;
+    this.tradeIndex = (this.tradeIndex + 1) % this.tradeTimestamps.length;
 
     // Emit trade event for real-time notifications
     this.emit('trade', trade);
@@ -504,18 +532,114 @@ export class MatchingEngine extends EventEmitter {
   }
 
   /**
-   * Get comprehensive engine performance statistics
+   * Get comprehensive engine performance statistics with caching for performance
    * Used for monitoring and debugging high-volume scenarios
    */
   getEngineStats() {
-    return {
+    const now = Date.now();
+    
+    // Use cached results if they're less than 500ms old (to avoid expensive calculations on every WebSocket update)
+    if (this.metricsCalculationCache && 
+        now - this.metricsCalculationCache.lastCalculated < 500) {
+      return {
+        ...this.metricsCalculationCache.data,
+        timestamp: now // Always update timestamp for freshness indicator
+      };
+    }
+    
+    // Calculate time-windowed metrics efficiently
+    const ordersLast10s = this.countEventsInTimeWindow(this.orderTimestamps, now, 10000);
+    const ordersLast1m = this.countEventsInTimeWindow(this.orderTimestamps, now, 60000);
+    const ordersLast1h = this.countEventsInTimeWindow(this.orderTimestamps, now, 3600000);
+    
+    const tradesLast10s = this.countEventsInTimeWindow(this.tradeTimestamps, now, 10000);
+    const tradesLast1m = this.countEventsInTimeWindow(this.tradeTimestamps, now, 60000);
+    const tradesLast1h = this.countEventsInTimeWindow(this.tradeTimestamps, now, 3600000);
+    
+    // Calculate rates per second
+    const ordersPerSecond10s = ordersLast10s / 10;
+    const ordersPerSecond1m = ordersLast1m / 60;
+    const tradesPerSecond10s = tradesLast10s / 10;
+    const tradesPerSecond1m = tradesLast1m / 60;
+    
+    // Calculate match efficiency (percentage of orders that result in trades)
+    const matchEfficiency = this.orderCount > 0 ? (this.ordersMatched / this.orderCount) * 100 : 0;
+    
+    const calculatedData = {
+      // Total counters
       orderCount: this.orderCount,
       tradeCount: this.tradeCount,
       tradeSequence: this.tradeSequence,
-      recentOrdersPerSecond: this.recentOrderTimestamps.length,
+      ordersMatched: this.ordersMatched,
+      
+      // Time-windowed metrics
+      ordersLast10s,
+      ordersLast1m,
+      ordersLast1h,
+      tradesLast10s,
+      tradesLast1m,
+      tradesLast1h,
+      
+      // Rates (per second)
+      ordersPerSecond10s: Math.round(ordersPerSecond10s * 100) / 100,
+      ordersPerSecond1m: Math.round(ordersPerSecond1m * 100) / 100,
+      tradesPerSecond10s: Math.round(tradesPerSecond10s * 100) / 100,
+      tradesPerSecond1m: Math.round(tradesPerSecond1m * 100) / 100,
+      
+      // Efficiency metrics
+      matchEfficiency: Math.round(matchEfficiency * 100) / 100,
+      
+      // System metrics
       supportedPairs: this.getSupportedPairs().length,
       poolSize: orderPool.getPoolSize(),
-      memoryUsage: process.memoryUsage()
+      memoryUsage: process.memoryUsage(),
+      recentOrdersPerSecond: this.recentOrderTimestamps.length, // Legacy metric
+      
+      // Metadata
+      timestamp: now
     };
+    
+    // Cache the results
+    this.metricsCalculationCache = {
+      lastCalculated: now,
+      data: calculatedData
+    };
+    
+    return calculatedData;
+  }
+  
+  /**
+   * Efficiently count events in a time window using circular buffer with early termination
+   * O(n) where n is buffer size, but optimized for sparse arrays and early termination
+   */
+  private countEventsInTimeWindow(timestamps: number[], currentTime: number, windowMs: number): number {
+    const cutoffTime = currentTime - windowMs;
+    let count = 0;
+    
+    // For performance, iterate backwards from current index to find recent entries first
+    // This helps because recent entries are more likely to be in the time window
+    const startIndex = timestamps === this.orderTimestamps ? this.orderIndex : this.tradeIndex;
+    
+    // Check recent entries first (circular buffer)
+    for (let i = 0; i < timestamps.length; i++) {
+      const index = (startIndex - 1 - i + timestamps.length) % timestamps.length;
+      const timestamp = timestamps[index];
+      
+      // Skip empty slots (zeros)
+      if (!timestamp) continue;
+      
+      // If we encounter a timestamp older than our window, we can stop early
+      // since entries are roughly in chronological order within recent history
+      if (timestamp < cutoffTime) {
+        // But continue checking a few more entries since circular buffer may have gaps
+        if (i > 10) break; // Only check up to 10 more entries
+      }
+      
+      if (timestamp > cutoffTime) {
+        count++;
+      }
+    }
+    
+    return count;
   }
 }

@@ -6,7 +6,7 @@ import { getErrorMessage } from '../utils/error-utils.js';
 
 interface WebSocketMessage {
   type: 'subscribe' | 'unsubscribe' | 'ping';
-  channel?: 'trades' | 'orderbook' | 'ticker';
+  channel?: 'trades' | 'orderbook' | 'ticker' | 'metrics';
   pair?: string;
 }
 
@@ -26,12 +26,17 @@ export class WebSocketService {
   private readonly UPDATE_THROTTLE_MS = 16; // Throttle updates to ~60Hz for responsive simulation
   private readonly MAX_TRADES_PER_BATCH = 10;
   private readonly log: FastifyBaseLogger | undefined;
+  
+  // Metrics broadcasting
+  private metricsInterval: NodeJS.Timeout | null = null;
+  private readonly METRICS_UPDATE_INTERVAL = 1000; // 1 second for real-time metrics
 
   constructor(matchingEngine: MatchingEngine, logger?: FastifyBaseLogger) {
     this.matchingEngine = matchingEngine;
     this.log = logger;
     this.setupEventListeners();
     this.startPingInterval();
+    this.startMetricsInterval();
   }
 
   async register(fastify: FastifyInstance): Promise<void> {
@@ -137,6 +142,14 @@ export class WebSocketService {
         type: 'orderbook',
         pair,
         data: depth,
+        timestamp: Date.now()
+      });
+    } else if (channel === 'metrics') {
+      // Send initial metrics when subscribing
+      const metrics = this.matchingEngine.getEngineStats();
+      this.sendMessage(client, {
+        type: 'metrics',
+        data: metrics,
         timestamp: Date.now()
       });
     }
@@ -257,10 +270,46 @@ export class WebSocketService {
       });
     }, 30000);
   }
+  
+  private startMetricsInterval(): void {
+    this.metricsInterval = setInterval(() => {
+      this.broadcastMetrics();
+    }, this.METRICS_UPDATE_INTERVAL);
+  }
+  
+  private broadcastMetrics(): void {
+    // Only broadcast if there are clients subscribed to metrics
+    const hasMetricsSubscribers = Array.from(this.clients.values()).some(client => 
+      client.subscriptions.has('metrics')
+    );
+    
+    if (!hasMetricsSubscribers) return;
+    
+    try {
+      const metrics = this.matchingEngine.getEngineStats();
+      const message = {
+        type: 'metrics',
+        data: metrics,
+        timestamp: Date.now()
+      };
+
+      this.clients.forEach(client => {
+        if (client.subscriptions.has('metrics')) {
+          this.sendMessage(client, message);
+        }
+      });
+    } catch (error) {
+      this.log?.error('Error broadcasting metrics:', error);
+    }
+  }
 
   shutdown(): void {
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
+    }
+    
+    if (this.metricsInterval) {
+      clearInterval(this.metricsInterval);
     }
 
     // Clear all throttle timers

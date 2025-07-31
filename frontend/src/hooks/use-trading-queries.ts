@@ -1,8 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { api, type PlaceOrderRequest } from '../services/api';
 import { binanceAPI } from '../services/binance-api';
+import { wsService } from '../services/websocket';
 import type { MarketDepth, TradingPair } from '../types/trading.js';
 import type { Time } from 'lightweight-charts';
+
+interface EngineMetrics {
+	orderCount: number;
+	tradeCount: number;
+	ordersMatched: number;
+	ordersLast10s: number;
+	ordersLast1m: number;
+	ordersLast1h: number;
+	tradesLast10s: number;
+	tradesLast1m: number;
+	tradesLast1h: number;
+	ordersPerSecond10s: number;
+	ordersPerSecond1m: number;
+	tradesPerSecond10s: number;
+	tradesPerSecond1m: number;
+	matchEfficiency: number;
+	supportedPairs: number;
+	poolSize: number;
+	memoryUsage: {
+		heapUsed: number;
+		heapTotal: number;
+	};
+	timestamp: number;
+}
 
 export const useOrderBook = (pair: string, levels: number = 20) => {
   return useQuery<MarketDepth>({
@@ -27,6 +53,55 @@ export const useMetrics = () => {
     queryFn: api.getMetrics,
     refetchInterval: 5_000
   });
+};
+
+export const useRealtimeMetrics = () => {
+  const queryClient = useQueryClient();
+  const handlerRef = useRef<((data: unknown) => void) | null>(null);
+
+  const query = useQuery<EngineMetrics>({
+    queryKey: ['realtime-metrics'],
+    queryFn: async () => {
+      // Initial fetch from REST API if WebSocket isn't connected yet
+      const response = await fetch('/api/engine/stats');
+      if (!response.ok) throw new Error('Failed to fetch initial metrics');
+      return response.json().then(data => data.engine);
+    },
+    staleTime: 2000, // Consider data stale after 2 seconds
+    refetchOnWindowFocus: false,
+    refetchOnMount: false
+  });
+
+  useEffect(() => {
+    // Create handler for WebSocket updates
+    handlerRef.current = (data: unknown) => {
+      const metricsData = data as EngineMetrics;
+      queryClient.setQueryData(['realtime-metrics'], metricsData);
+    };
+
+    // Connect WebSocket and subscribe to metrics
+    const connectAndSubscribe = async () => {
+      try {
+        await wsService.connect();
+        if (handlerRef.current) {
+          wsService.subscribeToMetrics(handlerRef.current);
+        }
+      } catch (error) {
+        console.error('Failed to connect to WebSocket for metrics:', error);
+      }
+    };
+
+    connectAndSubscribe();
+
+    // Cleanup function
+    return () => {
+      if (handlerRef.current) {
+        wsService.unsubscribeFromMetrics(handlerRef.current);
+      }
+    };
+  }, [queryClient]);
+
+  return query;
 };
 
 export const usePlaceOrder = () => {
