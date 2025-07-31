@@ -20,8 +20,7 @@ const server = fastify({
   } as any
 });
 
-console.log('process.env[\'HIDE_LOGS\']', process.env['HIDE_LOGS'])
-console.log('server.log.level', server.log.level)
+
 const matchingEngine = new MatchingEngine(server.log);
 const wsService = new WebSocketService(matchingEngine, server.log);
 const simulationClient = new SimulationClient(server.log);
