@@ -131,7 +131,7 @@ export class SimulationService {
       });
       this.logger.log(simulationId, 'SeedingComplete', { successful, total: seedOrders.length });
     } catch (error) {
-      this.logger.log(simulationId, 'SeedingError', { error: error.message });
+      this.logger.log(simulationId, 'SeedingError', { error: error.message, stack: error.stack });
     }
   }
 
@@ -259,7 +259,7 @@ export class SimulationService {
         status.ordersSent = successfulSends;
         status.memoryUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
       } catch (error) {
-        this.logger.log(simulationId, 'BatchError', { error: error.message });
+        this.logger.log(simulationId, 'BatchError', { error: error.message, stack: error.stack });
       }
 
       if (orderCount < targetOrders && status.status === 'running') {
@@ -295,7 +295,9 @@ export class SimulationService {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+      const errorBody = await response.text();
+      console.error(`Failed to send order. Status: ${response.status}, Body: ${errorBody}`);
+      throw new Error(`HTTP ${response.status}: ${errorBody}`);
     }
   }
 
