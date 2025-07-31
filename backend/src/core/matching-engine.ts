@@ -50,8 +50,11 @@ export class MatchingEngine extends EventEmitter {
    * @param makerFeeRate - Fee rate for market makers (default 0.1%)
    * @param takerFeeRate - Fee rate for market takers (default 0.2%)
    */
-  constructor(makerFeeRate: number = 0.001, takerFeeRate: number = 0.002) {
+  private readonly logger: any; // Fastify logger instance
+
+  constructor(logger: any, makerFeeRate: number = 0.001, takerFeeRate: number = 0.002) {
     super();
+    this.logger = logger;
     this.orderBooks = new Map();           // Initialize empty order book collection
     this.tradeSequence = 0;                // Start trade sequence from 0
     this.makerFeeRate = makerFeeRate;      // Store maker fee rate (typically lower)
@@ -118,11 +121,24 @@ export class MatchingEngine extends EventEmitter {
       return;
     }
 
-    // Reject zero-amount orders
-    if (parseFloat(order.amount) <= 0) {
+    // Reject zero-amount or invalid amount orders
+    const orderAmountNum = parseFloat(order.amount);
+    if (isNaN(orderAmountNum) || orderAmountNum <= 0) {
+      this.logger.warn(`Rejected order ${order.id} due to invalid amount: ${order.amount}`);
       order.status = 'cancelled';
       this.emit('orderUpdate', order);
       return;
+    }
+
+    // Reject invalid price for limit orders
+    if (order.type === 'limit') {
+      const orderPriceNum = parseFloat(order.price);
+      if (isNaN(orderPriceNum) || orderPriceNum <= 0) {
+        this.logger.warn(`Rejected order ${order.id} due to invalid price for limit order: ${order.price}`);
+        order.status = 'cancelled';
+        this.emit('orderUpdate', order);
+        return;
+      }
     }
 
     this.orderCount++;
@@ -428,7 +444,7 @@ export class MatchingEngine extends EventEmitter {
     
     // Rate limiting check
     if (this.recentOrderTimestamps.length >= this.maxOrdersPerSecond) {
-      console.warn(`Rate limit exceeded: ${this.recentOrderTimestamps.length} orders/sec`);
+      this.logger.warn(`Rate limit exceeded: ${this.recentOrderTimestamps.length} orders/sec`);
       return false;
     }
     
@@ -439,17 +455,17 @@ export class MatchingEngine extends EventEmitter {
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
       
-      console.log(`MatchingEngine Stats: ${heapUsedMB}MB heap, ${this.orderCount} orders, ${this.tradeCount} trades, ${orderPool.getPoolSize()} pooled`);
+      this.logger.info(`MatchingEngine Stats: ${heapUsedMB}MB heap, ${this.orderCount} orders, ${this.tradeCount} trades, ${orderPool.getPoolSize()} pooled`);
       
       if (heapUsedMB > 3500) { // Warning at 3.5GB
-        console.warn('MatchingEngine: High memory usage detected');
+        this.logger.warn('MatchingEngine: High memory usage detected');
         if (global.gc) {
           global.gc();
         }
         
         // Emergency rate limiting if memory is very high
         if (heapUsedMB > 4000) {
-          console.error('MatchingEngine: Emergency rate limiting activated');
+          this.logger.error('MatchingEngine: Emergency rate limiting activated');
           return false;
         }
       }
@@ -473,7 +489,7 @@ export class MatchingEngine extends EventEmitter {
         
         // If order book becomes too large, it might indicate memory issues
         if (stats.orderCount > 10000) {
-          console.warn(`Large order book detected for ${pair}: ${stats.orderCount} orders`);
+          this.logger.warn(`Large order book detected for ${pair}: ${stats.orderCount} orders`);
         }
       });
       

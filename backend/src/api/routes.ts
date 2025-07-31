@@ -4,7 +4,7 @@ import { CryptoOrder } from '../types/trading.js';
 import { nanoid } from 'nanoid';
 import { marketDataService } from '../services/market-data-service.js';
 import { createPooledOrder, releaseOrder, orderPool } from '../utils/object-pool.js';
-import { simulationClient } from '../services/simulation-client.js';
+import { SimulationClient } from '../services/simulation-client.js';
 import { numberToString } from '../utils/precision.js';
 
 interface PlaceOrderBody {
@@ -41,21 +41,21 @@ const validateApiKey = async (request: any, reply: any) => {
   }
 };
 
-export function registerRoutes(fastify: FastifyInstance, matchingEngine: MatchingEngine): void {
+export function registerRoutes(fastify: FastifyInstance, matchingEngine: MatchingEngine, simulationClient: SimulationClient): void {
   // Rate limiting configurations
   const publicRateLimit = {
     max: 100,
-    timeWindow: '1 minute'
+    timeWindow: 1_000, // 1 second
   };
 
   const authenticatedRateLimit = {
-    max: 1000,
-    timeWindow: '1 minute',
+    max: async (_request: any, key: string) => key === 'unlimited' ? 5_000_000 : 1000, // 1000 per second is the max for a client
+    timeWindow: 1_000, // 1 second
     keyGenerator: (request: any) => {
       const apiKey = request.headers['x-api-key'];
       // Give simulation server unlimited requests by using a unique key space
       if (apiKey === process.env['SIMULATION_API_KEY']) {
-        return `unlimited:${apiKey}:${Math.floor(Date.now() / 60000)}`; // New key every minute = unlimited
+        return `unlimited`; // New key every minute = unlimited
       }
       return request.ip;
     }
@@ -485,19 +485,19 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     // Try external simulation server first for high-volume requests
     if (!forceLocal && await simulationClient.isExternalSimulationAvailable()) {
       try {
-        console.log(`Delegating high-volume simulation (${ordersPerSecond} orders/sec) to external server`);
+        fastify.log.info(`Delegating high-volume simulation (${ordersPerSecond} orders/sec) to external server`);
         const response = await simulationClient.startExternalSimulation({
           ordersPerSecond,
           durationSeconds,
           pair
         });
-        console.log('External simulation response:', response);
+        fastify.log.info('External simulation response:', response);
         return reply.send({
           externalSimulation: true,
           ...response
         });
       } catch (error) {
-        console.warn('External simulation failed, falling back to local simulation:', error);
+        fastify.log.warn('External simulation failed, falling back to local simulation:', error);
         // Continue with local simulation
       }
     }
@@ -512,7 +512,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
     try {
       params = marketDataService.generateRealisticOrderParams(marketPrice);
     } catch (error) {
-      console.error('Error generating order parameters:', error);
+      fastify.log.error('Error generating order parameters:', error);
       return reply.code(500).send({ error: 'Invalid market data received' });
     }
 
@@ -605,8 +605,12 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
           const bidPriceNum = parseFloat(stats.bestBid.price);
           const askPriceNum = parseFloat(stats.bestAsk.price);
           const midPrice = (bidPriceNum + askPriceNum) / 2;
-          // Smooth price updates to prevent wild swings
-          currentPrice = currentPrice * 0.9 + midPrice * 0.1;
+          // Smooth price updates to prevent wild swings, ensure midPrice is a valid number
+          if (!isNaN(midPrice)) {
+            currentPrice = currentPrice * 0.9 + midPrice * 0.1;
+          } else {
+            fastify.log.warn(`MidPrice is NaN. bidPrice: ${stats.bestBid.price}, askPrice: ${stats.bestAsk.price}. Retaining previous currentPrice.`);
+          }
         }
 
         priceHistory.push(currentPrice);
@@ -620,10 +624,10 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
           const memUsage = process.memoryUsage();
           const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
           const poolSize = orderPool.getPoolSize();
-          console.log(`Memory: ${heapUsedMB}MB heap, ${poolSize} pooled orders, ${processedOrders.size} active`);
+          fastify.log.info(`Memory: ${heapUsedMB}MB heap, ${poolSize} pooled orders, ${processedOrders.size} active`);
 
           if (heapUsedMB > 3500) { // Warning at 3.5GB
-            console.warn('High memory usage detected, triggering GC');
+            fastify.log.warn('High memory usage detected, triggering GC');
             if (global.gc) {
               global.gc();
             }
@@ -642,8 +646,8 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
         const finalPrice = priceHistory[priceHistory.length - 1] || params.basePrice;
         const priceChange = ((finalPrice - params.basePrice) / params.basePrice) * 100;
 
-        console.log(`Simulation completed: ${orderCount} orders in ${duration}s (${actualOrdersPerSecond.toFixed(0)} orders/sec)`);
-        console.log(`Price moved from $${params.basePrice.toFixed(2)} to $${finalPrice.toFixed(2)} (${priceChange.toFixed(2)}%)`);
+        fastify.log.info(`Simulation completed: ${orderCount} orders in ${duration}s (${actualOrdersPerSecond.toFixed(0)} orders/sec)`);
+        fastify.log.info(`Price moved from ${params.basePrice.toFixed(2)} to ${finalPrice.toFixed(2)} (${priceChange.toFixed(2)}%)`);
 
         // Final cleanup - release any remaining orders
         setTimeout(() => {
@@ -652,11 +656,11 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
 
           const finalMemUsage = process.memoryUsage();
           const finalHeapMB = Math.round(finalMemUsage.heapUsed / 1024 / 1024);
-          console.log(`Final memory usage: ${finalHeapMB}MB heap, ${orderPool.getPoolSize()} pooled orders`);
+          fastify.log.info(`Final memory usage: ${finalHeapMB}MB heap, ${orderPool.getPoolSize()} pooled orders`);
 
           if (global.gc) {
             global.gc();
-            console.log('Final garbage collection triggered');
+            fastify.log.info('Final garbage collection triggered');
           }
         }, 2000);
       }
@@ -764,7 +768,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
       if (error instanceof Error && error.message.includes('404')) {
         return reply.code(404).send({ error: 'Simulation logs not found' });
       }
-      console.error('Error fetching simulation logs:', error);
+      fastify.log.error('Error fetching simulation logs:', error);
       return reply.code(500).send({ error: 'Failed to retrieve simulation logs' });
     }
   });
@@ -936,7 +940,7 @@ export function registerRoutes(fastify: FastifyInstance, matchingEngine: Matchin
       });
 
     } catch (error) {
-      console.error('Error generating liquidity:', error);
+      fastify.log.error('Error generating liquidity:', error);
       return reply.code(500).send({ error: 'Failed to generate liquidity' });
     }
   });

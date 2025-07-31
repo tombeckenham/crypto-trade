@@ -1,4 +1,4 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
 import { MatchingEngine } from '../core/matching-engine.js';
 import { CryptoOrder, CryptoTrade } from '../types/trading.js';
@@ -25,9 +25,11 @@ export class WebSocketService {
   private tradeBuffer: Map<string, CryptoTrade[]> = new Map();
   private readonly UPDATE_THROTTLE_MS = 16; // Throttle updates to ~60Hz for responsive simulation
   private readonly MAX_TRADES_PER_BATCH = 10;
+  private readonly logger: any;
 
-  constructor(matchingEngine: MatchingEngine) {
+  constructor(matchingEngine: MatchingEngine, logger: FastifyBaseLogger) {
     this.matchingEngine = matchingEngine;
+    this.logger = logger;
     this.setupEventListeners();
     this.startPingInterval();
   }
@@ -61,7 +63,7 @@ export class WebSocketService {
       });
 
       socket.on('error', (error: Error) => {
-        console.error(`WebSocket error for client ${clientId}:`, getErrorMessage(error));
+        this.logger.error(`WebSocket error for client ${clientId}:`, getErrorMessage(error));
         self.clients.delete(clientId);
       });
 
@@ -86,7 +88,7 @@ export class WebSocketService {
   private handleMessage(client: WebSocketClient, message: Buffer): void {
     try {
       const data: WebSocketMessage = JSON.parse(message.toString());
-      console.log(`Received message from client ${client.id}:`, data);
+      this.logger.debug(`Received message from client ${client.id}:`, data);
 
       switch (data.type) {
         case 'subscribe':
@@ -104,7 +106,7 @@ export class WebSocketService {
           break;
       }
     } catch (error) {
-      console.error(`Error handling message from client ${client.id}:`, error);
+      this.logger.error(`Error handling message from client ${client.id}:`, error);
       this.sendMessage(client, {
         type: 'error',
         message: 'Invalid message format'
@@ -113,8 +115,8 @@ export class WebSocketService {
   }
 
   private subscribe(client: WebSocketClient, channel: string, pair: string): void {
-    console.log(`Client ${client.id} subscribing to ${channel}:${pair}`);
-    
+    this.logger.debug(`Client ${client.id} subscribing to ${channel}:${pair}`);
+
     if (!client.subscriptions.has(channel)) {
       client.subscriptions.set(channel, new Set());
     }
@@ -129,7 +131,7 @@ export class WebSocketService {
 
     if (channel === 'orderbook') {
       const depth = this.matchingEngine.getMarketDepth(pair);
-      console.log(`Sending initial order book data for ${pair}:`, depth);
+      this.logger.debug(`Sending initial order book data for ${pair}:`, depth);
 
       this.sendMessage(client, {
         type: 'orderbook',
@@ -161,10 +163,10 @@ export class WebSocketService {
     if (!this.tradeBuffer.has(trade.pair)) {
       this.tradeBuffer.set(trade.pair, []);
     }
-    
+
     const buffer = this.tradeBuffer.get(trade.pair)!;
     buffer.push(trade);
-    
+
     // Flush buffer if it gets too large or set timer to flush
     if (buffer.length >= this.MAX_TRADES_PER_BATCH) {
       this.flushTradeBuffer(trade.pair);
@@ -227,7 +229,7 @@ export class WebSocketService {
         }
       });
     } catch (error) {
-      console.error(`Error broadcasting order book update for ${pair}:`, error);
+      this.logger.error(`Error broadcasting order book update for ${pair}:`, error);
     }
   }
 
@@ -264,7 +266,7 @@ export class WebSocketService {
     // Clear all throttle timers
     this.updateThrottles.forEach(timeout => clearTimeout(timeout));
     this.updateThrottles.clear();
-    
+
     // Clear trade buffers
     this.tradeBuffer.clear();
 

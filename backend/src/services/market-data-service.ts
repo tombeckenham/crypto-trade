@@ -52,10 +52,10 @@ class MarketDataService {
       const ticker = await response.json() as BinanceTicker;
       
       // Validate that we have valid numeric data
-      const price = parseFloat(ticker.lastPrice);
-      const bid = parseFloat(ticker.bidPrice);
-      const ask = parseFloat(ticker.askPrice);
-      
+      const price = ticker.lastPrice ? parseFloat(ticker.lastPrice) : NaN;
+      const bid = ticker.bidPrice ? parseFloat(ticker.bidPrice) : NaN;
+      const ask = ticker.askPrice ? parseFloat(ticker.askPrice) : NaN;
+
       if (isNaN(price) || isNaN(bid) || isNaN(ask)) {
         console.warn(`Invalid price data from Binance for ${binanceSymbol}, using fallback`);
         return this.getFallbackPrice(pair);
@@ -167,14 +167,15 @@ class MarketDataService {
     marketOrderRatio: number;
   } {
     // Validate essential price data
-    if (isNaN(marketPrice.price) || marketPrice.price <= 0) {
-      throw new Error(`Invalid market price: ${marketPrice.price}`);
-    }
-    if (isNaN(marketPrice.bid) || isNaN(marketPrice.ask)) {
-      throw new Error(`Invalid bid/ask prices: bid=${marketPrice.bid}, ask=${marketPrice.ask}`);
-    }
-    if (isNaN(marketPrice.high24h) || isNaN(marketPrice.low24h)) {
-      throw new Error(`Invalid 24h high/low prices: high=${marketPrice.high24h}, low=${marketPrice.low24h}`);
+    if (isNaN(marketPrice.price) || marketPrice.price <= 0 || isNaN(marketPrice.bid) || isNaN(marketPrice.ask) || isNaN(marketPrice.high24h) || isNaN(marketPrice.low24h)) {
+      console.warn(`Invalid market price data received for simulation parameters. Falling back to default values. Price: ${marketPrice.price}, Bid: ${marketPrice.bid}, Ask: ${marketPrice.ask}, High24h: ${marketPrice.high24h}, Low24h: ${marketPrice.low24h}`);
+      return {
+        basePrice: 50000,
+        spread: 10,
+        volatility: 0.01,
+        avgOrderSize: 0.1,
+        marketOrderRatio: 0.3
+      };
     }
 
     const price = marketPrice.price;

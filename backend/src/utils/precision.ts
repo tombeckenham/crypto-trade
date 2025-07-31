@@ -20,6 +20,11 @@ export function numberToString(num: number): string {
     str = str.replace(/\.?0+$/, '');
   }
   
+  // Ensure that if the string becomes empty (e.g., from 0.000), it returns "0"
+  if (str === '') {
+    return '0';
+  }
+
   return str;
 }
 

@@ -1,3 +1,4 @@
+import dotenv from 'dotenv'; // Load environment variables from .env file
 import fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
@@ -6,22 +7,29 @@ import swaggerUi from '@fastify/swagger-ui';
 import { MatchingEngine } from './core/matching-engine.js';
 import { WebSocketService } from './services/websocket-service.js';
 import { registerRoutes } from './api/routes.js';
+import { SimulationClient } from './services/simulation-client.js';
+
+dotenv.config();
 
 const server = fastify({
   logger: {
-    level: process.env['NODE_ENV'] === 'production' ? 'info' : 'debug',
-    transport: process.env['NODE_ENV'] === 'development' ? {
+    level: (process.env['HIDE_LOGS'] || process.env['NODE_ENV'] === 'production') ? 'warn' : 'debug',
+    transport: (process.env['NODE_ENV'] === 'development' && !process.env['HIDE_LOGS']) ? {
       target: 'pino-pretty'
     } : undefined
   } as any
 });
 
-const matchingEngine = new MatchingEngine();
-const wsService = new WebSocketService(matchingEngine);
+console.log('process.env[\'HIDE_LOGS\']', process.env['HIDE_LOGS'])
+console.log('server.log.level', server.log.level)
+const matchingEngine = new MatchingEngine(server.log);
+const wsService = new WebSocketService(matchingEngine, server.log);
+const simulationClient = new SimulationClient(server.log);
 
 async function start() {
   try {
-    console.log('Starting CryptoTrade backend...');
+    server.log.info(`Starting CryptoTrade backend...`);
+    server.log.info(`SIMULATION_API_KEY: ${process.env['SIMULATION_API_KEY']}`);
 
     await server.register(cors, {
       origin: process.env['NODE_ENV'] === 'production' ? [
@@ -32,7 +40,7 @@ async function start() {
       ],
       credentials: true
     });
-    console.log('CORS registered');
+    server.log.info('CORS registered');
 
     // Global rate limiting for public endpoints
     await server.register(rateLimit, {
@@ -40,7 +48,7 @@ async function start() {
       max: 100, // Conservative limit for public endpoints
       timeWindow: '1 minute'
     });
-    console.log('Rate limiting registered');
+    server.log.info('Rate limiting registered');
 
     await server.register(swagger, {
       openapi: {
@@ -184,7 +192,7 @@ async function start() {
         }
       }
     });
-    console.log('Swagger registered');
+    server.log.info('Swagger registered');
 
     await server.register(swaggerUi, {
       routePrefix: '/docs',
@@ -201,41 +209,42 @@ async function start() {
       transformSpecification: (swaggerObject, _request, _reply) => { return swaggerObject },
       transformSpecificationClone: true
     });
-    console.log('Swagger UI registered');
+    server.log.info('Swagger UI registered');
 
     await wsService.register(server);
-    console.log('WebSocket service registered');
+    server.log.info('WebSocket service registered');
 
-    registerRoutes(server, matchingEngine);
-    console.log('Routes registered');
+    registerRoutes(server, matchingEngine, simulationClient);
+    server.log.info('Routes registered');
 
     const port = parseInt(process.env['PORT'] || '3001');
     const host = process.env['HOST'] || '0.0.0.0';
 
-    console.log(`Attempting to listen on ${host}:${port}...`);
+    server.log.info(`Attempting to listen on ${host}:${port}...`);
     await server.listen({ port, host });
 
-    console.log(`✅ CryptoTrade backend running on ${host}:${port}`);
-    console.log(`WebSocket endpoint: ws://${host}:${port}/ws/market`);
-    console.log(`REST API: http://${host}:${port}/api`);
-    console.log(`Health check: http://${host}:${port}/api/health`);
-    console.log(`📚 API Documentation: http://${host}:${port}/docs`);
+    server.log.info(`✅ CryptoTrade backend running on ${host}:${port}`);
+    server.log.info(`WebSocket endpoint: ws://${host}:${port}/ws/market`);
+    server.log.info(`REST API: http://${host}:${port}/api`);
+    server.log.info(`Health check: http://${host}:${port}/api/health`);
+    server.log.info(`📚 API Documentation: http://${host}:${port}/docs`);
   } catch (err) {
-    console.error('❌ Failed to start server:', err);
+    server.log.error('❌ Failed to start server:', err);
     server.log.error(err);
     process.exit(1);
   }
 }
 
 process.on('SIGINT', async () => {
-  console.log('\nShutting down gracefully...');
+  server.log.info('\nShutting down gracefully...');
   wsService.shutdown();
   await server.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\nShutting down gracefully...');
+  server.log.info('\nShutting down gracefully...');
+
   wsService.shutdown();
   await server.close();
   process.exit(0);
