@@ -3,7 +3,7 @@
  * Reuses order objects instead of creating/destroying millions of them
  */
 
-import { CryptoOrder } from '../types/trading.js';
+import { CryptoOrder } from '@shared/types/trading.js';
 import { nanoid } from 'nanoid';
 
 export class ObjectPool<T> {
@@ -87,7 +87,7 @@ export function createPooledOrder(
   userId: string
 ): CryptoOrder {
   const order = orderPool.acquire();
-  
+
   order.id = nanoid();
   order.pair = pair;
   order.side = side;
@@ -98,7 +98,7 @@ export function createPooledOrder(
   order.userId = userId;
   order.status = 'pending';
   order.filledAmount = '0';
-  
+
   return order;
 }
 

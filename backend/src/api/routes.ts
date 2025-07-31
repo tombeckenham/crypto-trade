@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { MatchingEngine } from '../core/matching-engine.js';
-import { CryptoOrder } from '../types/trading.js';
+import { CryptoOrder } from '@shared/types/trading.js';
 import { nanoid } from 'nanoid';
 import { marketDataService } from '../services/market-data-service.js';
 import { createPooledOrder, releaseOrder, orderPool } from '../utils/object-pool.js';

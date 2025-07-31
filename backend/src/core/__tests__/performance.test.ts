@@ -3,7 +3,7 @@ import { faker } from '@faker-js/faker';
 import { OrderBook } from '../order-book.js';
 import { MatchingEngine } from '../matching-engine.js';
 import { RedBlackTree } from '../red-black-tree.js';
-import { CryptoOrder, OrderSide } from '../../types/trading.js';
+import { CryptoOrder, OrderSide } from '@shared/types/trading.js';
 import { numberToString } from '../../utils/precision.js';
 
 describe('Performance Tests', () => {
@@ -32,7 +32,7 @@ describe('Performance Tests', () => {
 
       const duration = Date.now() - startTime;
       console.log(`${numInsertions} insertions took ${duration}ms`);
-      
+
       expect(duration).toBeLessThan(5000);
       expect(tree.getSize()).toBeGreaterThanOrEqual(80000); // At least 80K guaranteed unique keys
     });
@@ -41,7 +41,7 @@ describe('Performance Tests', () => {
       // First populate the tree
       const numItems = 10000;
       const keys: number[] = [];
-      
+
       for (let i = 0; i < numItems; i++) {
         const key = i * 2; // Use deterministic keys
         tree.insert(key, `value_${key}`);
@@ -60,7 +60,7 @@ describe('Performance Tests', () => {
 
       const duration = Date.now() - startTime;
       console.log(`${numLookups} lookups took ${duration}ms`);
-      
+
       expect(duration).toBeLessThan(2000); // Adjusted for deployment environment
     });
 
@@ -92,7 +92,7 @@ describe('Performance Tests', () => {
 
       const duration = Date.now() - startTime;
       console.log(`Mixed operations (${insertCount} inserts, ${deleteCount} deletes, ${findCount} finds) took ${duration}ms`);
-      
+
       expect(duration).toBeLessThan(3000);
     });
   });
@@ -128,7 +128,7 @@ describe('Performance Tests', () => {
 
       const duration = Date.now() - startTime;
       console.log(`${numOrders} order insertions took ${duration}ms`);
-      
+
       expect(duration).toBeLessThan(3000);
       expect(orderBook.getOrderCount()).toBe(numOrders);
     });
@@ -148,7 +148,7 @@ describe('Performance Tests', () => {
       for (let i = 0; i < numLookups; i++) {
         const bestBid = orderBook.getBestBid();
         const bestAsk = orderBook.getBestAsk();
-        
+
         // These operations should still be very fast
         if (bestBid) expect(bestBid.price).toBeTypeOf('string');
         if (bestAsk) expect(bestAsk.price).toBeTypeOf('string');
@@ -156,7 +156,7 @@ describe('Performance Tests', () => {
 
       const duration = Date.now() - startTime;
       console.log(`${numLookups} best bid/ask lookups took ${duration}ms`);
-      
+
       expect(duration).toBeLessThan(3000); // Adjusted for deployment environment variability
     });
 
@@ -181,14 +181,14 @@ describe('Performance Tests', () => {
 
       const duration = Date.now() - startTime;
       console.log(`${numUpdates} order updates took ${duration}ms`);
-      
+
       expect(duration).toBeLessThan(3000); // Adjusted for deployment environment
     });
 
     it('should generate market depth quickly even with many levels', () => {
       // Create a deep order book
       const levelsPerSide = 1000;
-      
+
       for (let i = 0; i < levelsPerSide; i++) {
         // Buy orders from 49000 down to 48001
         const buyOrder = createRandomOrder('buy');
@@ -213,7 +213,7 @@ describe('Performance Tests', () => {
 
       const duration = Date.now() - startTime;
       console.log(`${numDepthQueries} market depth queries took ${duration}ms`);
-      
+
       expect(duration).toBeLessThan(2000); // Adjusted for deployment environment
     });
   });
@@ -255,10 +255,10 @@ describe('Performance Tests', () => {
 
       const duration = Date.now() - startTime;
       const ordersPerSecond = Math.floor(numOrders / (duration / 1000));
-      
+
       console.log(`${numOrders} orders processed in ${duration}ms (${ordersPerSecond} orders/sec)`);
       console.log(`Generated ${tradesGenerated} trades`);
-      
+
       expect(duration).toBeLessThan(5000);
       expect(ordersPerSecond).toBeGreaterThan(5000); // Should handle >5K orders per second
     });
@@ -290,7 +290,7 @@ describe('Performance Tests', () => {
       const duration = Date.now() - startTime;
       console.log(`${marketOrders} market orders processed in ${duration}ms`);
       console.log(`Generated ${tradesGenerated} trades from market orders`);
-      
+
       expect(duration).toBeLessThan(3000);
     });
 
@@ -298,7 +298,7 @@ describe('Performance Tests', () => {
       const pairs = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'BNB-USDT', 'XRP-USDT'];
       const ordersPerPair = 5000;
       const totalOrders = pairs.length * ordersPerPair;
-      
+
       const startTime = Date.now();
       let tradesGenerated = 0;
 
@@ -317,7 +317,7 @@ describe('Performance Tests', () => {
       console.log(`${totalOrders} orders across ${pairs.length} pairs processed in ${duration}ms`);
       console.log(`Generated ${tradesGenerated} trades`);
       console.log(`Supported pairs: ${engine.getSupportedPairs().join(', ')}`);
-      
+
       expect(duration).toBeLessThan(8000);
       expect(engine.getSupportedPairs().length).toBe(pairs.length);
     });
@@ -353,7 +353,7 @@ describe('Performance Tests', () => {
       const duration = Date.now() - startTime;
       console.log(`${numCancellations} cancellation attempts took ${duration}ms`);
       console.log(`${successfulCancellations} successful cancellations`);
-      
+
       expect(duration).toBeLessThan(2000);
       expect(successfulCancellations).toBeGreaterThan(numCancellations * 0.8); // Most should succeed
     });
@@ -363,16 +363,16 @@ describe('Performance Tests', () => {
     it('should maintain reasonable memory usage under sustained load', () => {
       const engine = new MatchingEngine();
       const initialMemory = process.memoryUsage();
-      
+
       // Create sustained trading activity
       const iterations = 5;
       const ordersPerIteration = 10000;
 
       for (let iteration = 0; iteration < iterations; iteration++) {
         console.log(`Memory test iteration ${iteration + 1}/${iterations}`);
-        
+
         const orders: CryptoOrder[] = [];
-        
+
         // Add orders
         for (let i = 0; i < ordersPerIteration; i++) {
           const order: CryptoOrder = {
@@ -387,7 +387,7 @@ describe('Performance Tests', () => {
             status: 'pending',
             filledAmount: '0'
           };
-          
+
           engine.submitOrder(order);
           orders.push(order);
         }
@@ -407,10 +407,10 @@ describe('Performance Tests', () => {
       const finalMemory = process.memoryUsage();
       const memoryIncrease = finalMemory.heapUsed - initialMemory.heapUsed;
       const memoryIncreaseMB = memoryIncrease / (1024 * 1024);
-      
+
       console.log(`Memory increase: ${memoryIncreaseMB.toFixed(2)} MB`);
       console.log(`Final heap used: ${(finalMemory.heapUsed / 1024 / 1024).toFixed(2)} MB`);
-      
+
       // Memory increase should be reasonable (less than 100MB for this load)
       expect(memoryIncreaseMB).toBeLessThan(100);
     });

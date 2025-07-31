@@ -1,4 +1,4 @@
-import type { CryptoTrade, MarketDepth, TradingPair } from "../types/trading";
+import type { CryptoTrade, MarketDepth, Metrics, TradingPair } from "@shared/types/trading.js";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const API_KEY = import.meta.env.VITE_API_KEY;
@@ -121,7 +121,7 @@ export const api = {
     return handleResponse(response);
   },
 
-  async getMetrics() {
+  async getMetrics(): Promise<Metrics> {
     const response = await fetch(`${API_BASE_URL}/metrics`);
     return handleResponse(response);
   },

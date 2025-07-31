@@ -59,3 +59,25 @@ export interface Ticker {
   priceChangePercent24h: string;
   timestamp: number;
 }
+
+export interface TradingPair {
+  symbol: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  active: boolean;
+}
+
+export interface OrderBookStats {
+  pair: string;
+  bestBid: OrderBookLevel | null;
+  bestAsk: OrderBookLevel | null;
+  spread: string;
+  bidVolume: string;
+  askVolume: string;
+  orderCount: number;
+}
+
+export interface Metrics {
+  timestamp: number;
+  pairs: OrderBookStats[];
+}

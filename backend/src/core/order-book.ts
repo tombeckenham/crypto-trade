@@ -1,5 +1,5 @@
 import { RedBlackTree } from './red-black-tree.js';
-import { CryptoOrder, OrderBookLevel, MarketDepth, OrderSide } from '../types/trading.js';
+import { CryptoOrder, OrderBookLevel, MarketDepth, OrderSide } from '@shared/types/trading.js';
 import { addStrings, subtractStrings, numberToString } from '../utils/precision.js';
 
 /**
@@ -96,11 +96,11 @@ export class OrderBook {
       const orderAmountNum = parseFloat(order.amount);
       const previousFilledNum = parseFloat(order.filledAmount);
       const newFilledNum = parseFloat(filledAmount);
-      
+
       const previousUnfilled = orderAmountNum - previousFilledNum;
       order.filledAmount = filledAmount;
       const newUnfilled = orderAmountNum - newFilledNum;
-      
+
       const amountChange = numberToString(newUnfilled - previousUnfilled);
       level.amount = addStrings(level.amount, amountChange);
 
@@ -200,10 +200,10 @@ export class OrderBook {
     // Clear all nodes from the trees by removing them individually
     const bidKeys = Array.from(this.bids.inOrderTraversal()).map(item => item.key);
     const askKeys = Array.from(this.asks.inOrderTraversal()).map(item => item.key);
-    
+
     bidKeys.forEach(key => this.bids.remove(key));
     askKeys.forEach(key => this.asks.remove(key));
-    
+
     this.orderMap.clear();
     this.lastUpdateTime = Date.now();
   }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { faker } from '@faker-js/faker';
 import { MatchingEngine } from '../matching-engine.js';
-import { CryptoOrder, CryptoTrade, OrderSide } from '../../types/trading.js';
+import { CryptoOrder, CryptoTrade, OrderSide } from '@shared/types/trading.js'
 
 describe('MatchingEngine', () => {
   let engine: MatchingEngine;
@@ -28,17 +28,17 @@ describe('MatchingEngine', () => {
   });
 
   beforeEach(() => {
-    engine = new MatchingEngine(0.001, 0.002); // 0.1% maker fee, 0.2% taker fee
+    engine = new MatchingEngine(console as any, 0.001, 0.002); // 0.1% maker fee, 0.2% taker fee
   });
 
   describe('Initialization', () => {
     it('should create engine with default fee rates', () => {
-      const defaultEngine = new MatchingEngine();
+      const defaultEngine = new MatchingEngine(console as any);
       expect(defaultEngine).toBeDefined();
     });
 
     it('should create engine with custom fee rates', () => {
-      const customEngine = new MatchingEngine(0.0005, 0.001);
+      const customEngine = new MatchingEngine(console as any, 0.0005, 0.001);
       expect(customEngine).toBeDefined();
     });
 
@@ -344,7 +344,7 @@ describe('MatchingEngine', () => {
       const tradeSpy = vi.fn();
 
       // Custom engine with known fee rates
-      const customEngine = new MatchingEngine(0.01, 0.02); // 1% maker, 2% taker
+      const customEngine = new MatchingEngine(undefined, 0.01, 0.02); // 1% maker, 2% taker
       customEngine.on('trade', tradeSpy);
 
       customEngine.submitOrder(createOrder('sell', "100", "1.0"));

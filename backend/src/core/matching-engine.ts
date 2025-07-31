@@ -1,9 +1,11 @@
 import { EventEmitter } from 'events';
 import { OrderBook } from './order-book.js';
-import { CryptoOrder, CryptoTrade } from '../types/trading.js';
+import { CryptoOrder, CryptoTrade } from '../../../frontend/src/types/trading.js';
 import { nanoid } from 'nanoid';
 import { orderPool } from '../utils/object-pool.js';
 import { addStrings, multiplyStrings, numberToString } from '../utils/precision.js';
+import { OrderBookStats } from '@shared/types/trading.js';
+import { FastifyBaseLogger } from 'fastify';
 
 /**
  * Event interface defining all events emitted by the MatchingEngine
@@ -36,7 +38,7 @@ export class MatchingEngine extends EventEmitter {
   private tradeSequence: number;                        // Incrementing counter for trade ordering
   private readonly makerFeeRate: number;               // Fee rate for liquidity providers (makers)
   private readonly takerFeeRate: number;               // Fee rate for liquidity consumers (takers)
-  
+
   // Memory protection and performance monitoring
   private orderCount: number = 0;                      // Total orders processed
   private tradeCount: number = 0;                      // Total trades executed
@@ -50,9 +52,9 @@ export class MatchingEngine extends EventEmitter {
    * @param makerFeeRate - Fee rate for market makers (default 0.1%)
    * @param takerFeeRate - Fee rate for market takers (default 0.2%)
    */
-  private readonly logger: any; // Fastify logger instance
+  private readonly logger: FastifyBaseLogger | undefined; // Fastify logger instance
 
-  constructor(logger: any, makerFeeRate: number = 0.001, takerFeeRate: number = 0.002) {
+  constructor(logger?: FastifyBaseLogger, makerFeeRate: number = 0.001, takerFeeRate: number = 0.002) {
     super();
     this.logger = logger;
     this.orderBooks = new Map();           // Initialize empty order book collection
@@ -124,7 +126,7 @@ export class MatchingEngine extends EventEmitter {
     // Reject zero-amount or invalid amount orders
     const orderAmountNum = parseFloat(order.amount);
     if (isNaN(orderAmountNum) || orderAmountNum <= 0) {
-      this.logger.warn(`Rejected order ${order.id} due to invalid amount: ${order.amount}`);
+      this.logger?.warn(`Rejected order ${order.id} due to invalid amount: ${order.amount}`);
       order.status = 'cancelled';
       this.emit('orderUpdate', order);
       return;
@@ -134,7 +136,7 @@ export class MatchingEngine extends EventEmitter {
     if (order.type === 'limit') {
       const orderPriceNum = parseFloat(order.price);
       if (isNaN(orderPriceNum) || orderPriceNum <= 0) {
-        this.logger.warn(`Rejected order ${order.id} due to invalid price for limit order: ${order.price}`);
+        this.logger?.warn(`Rejected order ${order.id} due to invalid price for limit order: ${order.price}`);
         order.status = 'cancelled';
         this.emit('orderUpdate', order);
         return;
@@ -166,14 +168,14 @@ export class MatchingEngine extends EventEmitter {
   cancelOrder(orderId: string, pair: string): boolean {
     const orderBook = this.getOrCreateOrderBook(pair);
     const order = orderBook.removeOrder(orderId);
-    
+
     if (order) {
       // Update order status and notify listeners
       order.status = 'cancelled';
       this.emit('orderCancelled', order);
       return true;
     }
-    
+
     return false;  // Order not found
   }
 
@@ -200,7 +202,7 @@ export class MatchingEngine extends EventEmitter {
     while (remainingAmount > 0) {
       // Get best counter-side price level for matching
       const bestLevel = isBuy ? orderBook.getBestAsk() : orderBook.getBestBid();
-      
+
       // Stop if no liquidity available
       if (!bestLevel || bestLevel.orders.length === 0) {
         break;  // Partial fill - market order becomes cancelled
@@ -208,7 +210,7 @@ export class MatchingEngine extends EventEmitter {
 
       // Take first order from best price level (FIFO within price level)
       const counterOrder = bestLevel.orders[0]!;
-      
+
       // Calculate trade amount - limited by smaller of remaining amounts
       const counterAmountNum = parseFloat(counterOrder.amount);
       const counterFilledNum = parseFloat(counterOrder.filledAmount);
@@ -221,14 +223,14 @@ export class MatchingEngine extends EventEmitter {
         const priceNum = parseFloat(bestLevel.price);
         const volume = matchAmount * priceNum;
         totalVolume += volume;
-        
+
         this.createTrade(order, counterOrder, bestLevel.price, numberToString(matchAmount), numberToString(volume));
-        
+
         order.filledAmount = addStrings(order.filledAmount, numberToString(matchAmount));
         remainingAmount -= matchAmount;
-        
+
         orderBook.updateOrderAmount(counterOrder.id, addStrings(counterOrder.filledAmount, numberToString(matchAmount)));
-        
+
         this.emit('orderUpdate', order);
         this.emit('orderUpdate', counterOrder);
       }
@@ -274,7 +276,7 @@ export class MatchingEngine extends EventEmitter {
     while (remainingAmount > 0) {
       // Get best counter-side price level
       const bestLevel = isBuy ? orderBook.getBestAsk() : orderBook.getBestBid();
-      
+
       // No counter-side liquidity available
       if (!bestLevel || bestLevel.orders.length === 0) {
         break;
@@ -304,14 +306,14 @@ export class MatchingEngine extends EventEmitter {
         const priceNum = parseFloat(bestLevel.price);
         const volume = matchAmount * priceNum;
         totalVolume += volume;
-        
+
         this.createTrade(order, counterOrder, bestLevel.price, numberToString(matchAmount), numberToString(volume));
-        
+
         order.filledAmount = addStrings(order.filledAmount, numberToString(matchAmount));
         remainingAmount -= matchAmount;
-        
+
         orderBook.updateOrderAmount(counterOrder.id, addStrings(counterOrder.filledAmount, numberToString(matchAmount)));
-        
+
         this.emit('orderUpdate', order);
         this.emit('orderUpdate', counterOrder);
       }
@@ -359,11 +361,11 @@ export class MatchingEngine extends EventEmitter {
       volume,                          // Total value (price * amount)
       timestamp: Date.now(),           // Execution time
       takerSide: takerOrder.side,      // Which side removed liquidity
-      
+
       // Order IDs for trade attribution
       buyOrderId: takerOrder.side === 'buy' ? takerOrder.id : makerOrder.id,
       sellOrderId: takerOrder.side === 'sell' ? takerOrder.id : makerOrder.id,
-      
+
       // Fee calculations based on volume
       makerFee: multiplyStrings(volume, numberToString(this.makerFeeRate)),    // Lower fee for liquidity provider
       takerFee: multiplyStrings(volume, numberToString(this.takerFeeRate))     // Higher fee for liquidity consumer
@@ -372,7 +374,7 @@ export class MatchingEngine extends EventEmitter {
     // Increment sequence counter for trade ordering
     this.tradeSequence++;
     this.tradeCount++;
-    
+
     // Emit trade event for real-time notifications
     this.emit('trade', trade);
   }
@@ -407,7 +409,7 @@ export class MatchingEngine extends EventEmitter {
    * @param pair - Trading pair identifier
    * @returns Object containing all order book statistics
    */
-  getOrderBookStats(pair: string) {
+  getOrderBookStats(pair: string): OrderBookStats {
     const orderBook = this.getOrCreateOrderBook(pair);
     return {
       pair,                                           // Trading pair identifier
@@ -436,43 +438,43 @@ export class MatchingEngine extends EventEmitter {
    */
   private checkMemoryAndRateLimit(): boolean {
     const now = Date.now();
-    
+
     // Clean old timestamps (keep only last second)
     this.recentOrderTimestamps = this.recentOrderTimestamps.filter(
       timestamp => now - timestamp < 1000
     );
-    
+
     // Rate limiting check
     if (this.recentOrderTimestamps.length >= this.maxOrdersPerSecond) {
-      this.logger.warn(`Rate limit exceeded: ${this.recentOrderTimestamps.length} orders/sec`);
+      this.logger?.warn(`Rate limit exceeded: ${this.recentOrderTimestamps.length} orders/sec`);
       return false;
     }
-    
+
     this.recentOrderTimestamps.push(now);
-    
+
     // Memory check every 5 seconds
     if (now - this.lastMemoryCheck > this.memoryCheckInterval) {
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-      
-      this.logger.info(`MatchingEngine Stats: ${heapUsedMB}MB heap, ${this.orderCount} orders, ${this.tradeCount} trades, ${orderPool.getPoolSize()} pooled`);
-      
+
+      this.logger?.info(`MatchingEngine Stats: ${heapUsedMB}MB heap, ${this.orderCount} orders, ${this.tradeCount} trades, ${orderPool.getPoolSize()} pooled`);
+
       if (heapUsedMB > 3500) { // Warning at 3.5GB
-        this.logger.warn('MatchingEngine: High memory usage detected');
+        this.logger?.warn('MatchingEngine: High memory usage detected');
         if (global.gc) {
           global.gc();
         }
-        
+
         // Emergency rate limiting if memory is very high
         if (heapUsedMB > 4000) {
-          this.logger.error('MatchingEngine: Emergency rate limiting activated');
+          this.logger?.error('MatchingEngine: Emergency rate limiting activated');
           return false;
         }
       }
-      
+
       this.lastMemoryCheck = now;
     }
-    
+
     return true;
   }
 
@@ -486,13 +488,13 @@ export class MatchingEngine extends EventEmitter {
       // Clean up filled orders from order books
       this.orderBooks.forEach((_orderBook, pair) => {
         const stats = this.getOrderBookStats(pair);
-        
+
         // If order book becomes too large, it might indicate memory issues
         if (stats.orderCount > 10000) {
-          this.logger.warn(`Large order book detected for ${pair}: ${stats.orderCount} orders`);
+          this.logger?.warn(`Large order book detected for ${pair}: ${stats.orderCount} orders`);
         }
       });
-      
+
       // Trim old timestamps more aggressively during cleanup
       const now = Date.now();
       this.recentOrderTimestamps = this.recentOrderTimestamps.filter(

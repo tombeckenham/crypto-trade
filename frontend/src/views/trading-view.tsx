@@ -12,7 +12,6 @@ import {
 } from "../hooks/use-trading-queries";
 import { useTradingStore } from "../store/trading-store";
 import { wsService } from "../services/websocket";
-import { type MarketDepth } from "../types/trading";
 import {
 	Select,
 	SelectContent,
@@ -21,6 +20,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import type { MarketDepth } from "@shared/types/trading";
 
 export const TradingView: React.FC = () => {
 	const {

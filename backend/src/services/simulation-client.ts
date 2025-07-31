@@ -34,11 +34,11 @@ interface SimulationStatus {
 
 
 export class SimulationClient {
-  private log: FastifyBaseLogger;
+  private log: FastifyBaseLogger | undefined;
   private simulationServerUrl: string = process.env['SIMULATION_SERVER_URL'] || 'http://localhost:3002';
   private mainServerUrl: string = process.env['PUBLIC_URL'] || 'http://localhost:3001';
 
-  constructor(logger: FastifyBaseLogger) {
+  constructor(logger?: FastifyBaseLogger) {
     this.log = logger;
     if (this.simulationServerUrl && !this.simulationServerUrl.startsWith('http')) {
       this.simulationServerUrl = `http://${this.simulationServerUrl}`;
@@ -63,7 +63,7 @@ export class SimulationClient {
       return response.json() as Promise<SimulationResponse>;
     } catch (error) {
       // Fallback to local simulation if external server unavailable
-      this.log.warn('External simulation server unavailable, falling back to local simulation', getErrorMessage(error));
+      this.log?.warn('External simulation server unavailable, falling back to local simulation', getErrorMessage(error));
       throw error;
     }
   }
@@ -120,7 +120,7 @@ export class SimulationClient {
       });
       return response.ok;
     } catch (error) {
-      this.log.warn('Simulation server health check failed:', error);
+      this.log?.warn('Simulation server health check failed:', error);
       return false;
     }
   }

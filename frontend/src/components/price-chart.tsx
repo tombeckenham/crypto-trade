@@ -7,7 +7,7 @@ import {
 	CandlestickSeries,
 	type TimeScaleOptions,
 } from "lightweight-charts";
-import { type CryptoTrade } from "../types/trading";
+import { type CryptoTrade } from "@shared/types/trading.js";
 import { useBinanceKlines } from "../hooks/use-trading-queries";
 
 interface PriceChartProps {
@@ -15,27 +15,31 @@ interface PriceChartProps {
 	pair: string;
 }
 
-type TimeInterval = '1m' | '1h' | '1d';
+type TimeInterval = "1m" | "1h" | "1d";
 
 const intervalLabels: Record<TimeInterval, string> = {
-	'1m': 'Minute',
-	'1h': 'Hour',
-	'1d': 'Day'
+	"1m": "Minute",
+	"1h": "Hour",
+	"1d": "Day",
 };
 
 const intervalLimits: Record<TimeInterval, number> = {
-	'1m': 288, // 24 hours of minutes
-	'1h': 168, // 1 week of hours
-	'1d': 30   // 30 days
+	"1m": 288, // 24 hours of minutes
+	"1h": 168, // 1 week of hours
+	"1d": 30, // 30 days
 };
 
 export const PriceChart: React.FC<PriceChartProps> = ({ pair }) => {
 	const chartContainerRef = useRef<HTMLDivElement>(null);
 	const chartRef = useRef<IChartApi | null>(null);
 	const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-	const [interval, setInterval] = useState<TimeInterval>('1m');
+	const [interval, setInterval] = useState<TimeInterval>("1m");
 
-	const { data: candleData, error } = useBinanceKlines(pair, interval, intervalLimits[interval]);
+	const { data: candleData, error } = useBinanceKlines(
+		pair,
+		interval,
+		intervalLimits[interval]
+	);
 
 	useEffect(() => {
 		if (!chartContainerRef.current) return;
@@ -45,9 +49,9 @@ export const PriceChart: React.FC<PriceChartProps> = ({ pair }) => {
 		const timeScaleOptions: Partial<TimeScaleOptions> = {
 			borderColor: "#444",
 			timeVisible: true,
-			secondsVisible: interval === '1m',
+			secondsVisible: interval === "1m",
 			minBarSpacing: 0.5,
-			barSpacing: interval === '1m' ? 6 : interval === '1h' ? 12 : 20,
+			barSpacing: interval === "1m" ? 6 : interval === "1h" ? 12 : 20,
 			fixLeftEdge: false,
 			fixRightEdge: false,
 			lockVisibleTimeRangeOnResize: true,
@@ -121,17 +125,20 @@ export const PriceChart: React.FC<PriceChartProps> = ({ pair }) => {
 	}, [interval]);
 
 	useEffect(() => {
-		if (!candleSeriesRef.current || !candleData || candleData.length === 0) return;
-		
+		if (!candleSeriesRef.current || !candleData || candleData.length === 0)
+			return;
+
 		// Clear existing data first
 		candleSeriesRef.current.setData([]);
-		
+
 		// Sort data by time to ensure proper ordering
-		const sortedData = [...candleData].sort((a, b) => Number(a.time) - Number(b.time));
-		
+		const sortedData = [...candleData].sort(
+			(a, b) => Number(a.time) - Number(b.time)
+		);
+
 		// Set the new data
 		candleSeriesRef.current.setData(sortedData);
-		
+
 		// Auto-fit the visible range to show all data
 		if (chartRef.current && sortedData.length > 0) {
 			chartRef.current.timeScale().fitContent();
@@ -161,7 +168,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({ pair }) => {
 				<span>{pair} Price Chart</span>
 				<div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
 					<div style={{ display: "flex", gap: "8px" }}>
-						{(['1m', '1h', '1d'] as TimeInterval[]).map((int) => (
+						{(["1m", "1h", "1d"] as TimeInterval[]).map((int) => (
 							<button
 								key={int}
 								onClick={() => setInterval(int)}

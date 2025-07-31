@@ -25,12 +25,17 @@ export interface CryptoTrade {
   volume: string;
   timestamp: number;
   takerSide: OrderSide;
+  buyOrderId: string;
+  sellOrderId: string;
+  makerFee: string;
+  takerFee: string;
 }
 
 export interface OrderBookLevel {
   price: string;
   amount: string;
   total: string;
+  id?: string;
 }
 
 export interface MarketDepth {

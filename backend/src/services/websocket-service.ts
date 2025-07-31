@@ -1,7 +1,7 @@
 import { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
 import { MatchingEngine } from '../core/matching-engine.js';
-import { CryptoOrder, CryptoTrade } from '../types/trading.js';
+import { CryptoOrder, CryptoTrade } from '@shared/types/trading.js';
 import { getErrorMessage } from '../utils/error-utils.js';
 
 interface WebSocketMessage {
@@ -25,11 +25,11 @@ export class WebSocketService {
   private tradeBuffer: Map<string, CryptoTrade[]> = new Map();
   private readonly UPDATE_THROTTLE_MS = 16; // Throttle updates to ~60Hz for responsive simulation
   private readonly MAX_TRADES_PER_BATCH = 10;
-  private readonly logger: any;
+  private readonly log: FastifyBaseLogger | undefined;
 
-  constructor(matchingEngine: MatchingEngine, logger: FastifyBaseLogger) {
+  constructor(matchingEngine: MatchingEngine, logger?: FastifyBaseLogger) {
     this.matchingEngine = matchingEngine;
-    this.logger = logger;
+    this.log = logger;
     this.setupEventListeners();
     this.startPingInterval();
   }
@@ -63,7 +63,7 @@ export class WebSocketService {
       });
 
       socket.on('error', (error: Error) => {
-        this.logger.error(`WebSocket error for client ${clientId}:`, getErrorMessage(error));
+        this.log?.error(`WebSocket error for client ${clientId}:`, getErrorMessage(error));
         self.clients.delete(clientId);
       });
 
@@ -88,7 +88,7 @@ export class WebSocketService {
   private handleMessage(client: WebSocketClient, message: Buffer): void {
     try {
       const data: WebSocketMessage = JSON.parse(message.toString());
-      this.logger.debug(`Received message from client ${client.id}:`, data);
+      this.log?.debug(`Received message from client ${client.id}:`, data);
 
       switch (data.type) {
         case 'subscribe':
@@ -106,7 +106,7 @@ export class WebSocketService {
           break;
       }
     } catch (error) {
-      this.logger.error(`Error handling message from client ${client.id}:`, error);
+      this.log?.error(`Error handling message from client ${client.id}:`, error);
       this.sendMessage(client, {
         type: 'error',
         message: 'Invalid message format'
@@ -115,7 +115,7 @@ export class WebSocketService {
   }
 
   private subscribe(client: WebSocketClient, channel: string, pair: string): void {
-    this.logger.debug(`Client ${client.id} subscribing to ${channel}:${pair}`);
+    this.log?.debug(`Client ${client.id} subscribing to ${channel}:${pair}`);
 
     if (!client.subscriptions.has(channel)) {
       client.subscriptions.set(channel, new Set());
@@ -131,7 +131,7 @@ export class WebSocketService {
 
     if (channel === 'orderbook') {
       const depth = this.matchingEngine.getMarketDepth(pair);
-      this.logger.debug(`Sending initial order book data for ${pair}:`, depth);
+      this.log?.debug(`Sending initial order book data for ${pair}:`, depth);
 
       this.sendMessage(client, {
         type: 'orderbook',
@@ -229,7 +229,7 @@ export class WebSocketService {
         }
       });
     } catch (error) {
-      this.logger.error(`Error broadcasting order book update for ${pair}:`, error);
+      this.log?.error(`Error broadcasting order book update for ${pair}:`, error);
     }
   }
 

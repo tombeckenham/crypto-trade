@@ -3,10 +3,12 @@ import { faker } from '@faker-js/faker';
 import fastify, { FastifyInstance } from 'fastify';
 import { MatchingEngine } from '../../core/matching-engine.js';
 import { registerRoutes } from '../routes.js';
+import { SimulationClient } from '../../services/simulation-client.js';
 
 describe('API Routes Integration Tests', () => {
   let app: FastifyInstance;
   let matchingEngine: MatchingEngine;
+  let simulationClient: SimulationClient;
   let testApiKey: string;
 
   beforeEach(async () => {
@@ -16,8 +18,9 @@ describe('API Routes Integration Tests', () => {
 
     // Create fresh instances for each test
     matchingEngine = new MatchingEngine();
+    simulationClient = new SimulationClient();
     app = fastify({ logger: false });
-    registerRoutes(app, matchingEngine);
+    registerRoutes(app, matchingEngine, simulationClient);
     await app.ready();
   });
 
