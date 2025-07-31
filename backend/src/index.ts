@@ -13,7 +13,7 @@ dotenv.config();
 
 const server = fastify({
   logger: {
-    level: (process.env['HIDE_LOGS'] || process.env['NODE_ENV'] === 'production') ? 'warn' : 'debug',
+    level: (process.env['HIDE_LOGS'] || process.env['NODE_ENV'] === 'production') ? 'debug' : 'debug',
     transport: (process.env['NODE_ENV'] === 'development' && !process.env['HIDE_LOGS']) ? {
       target: 'pino-pretty'
     } : undefined
