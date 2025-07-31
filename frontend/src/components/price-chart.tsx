@@ -52,8 +52,8 @@ export const PriceChart: React.FC<PriceChartProps> = ({ pair }) => {
 			secondsVisible: interval === "1m",
 			minBarSpacing: 0.5,
 			barSpacing: interval === "1m" ? 6 : interval === "1h" ? 12 : 20,
-			fixLeftEdge: false,
-			fixRightEdge: false,
+			fixLeftEdge: true,
+			fixRightEdge: true,
 			lockVisibleTimeRangeOnResize: true,
 		};
 
