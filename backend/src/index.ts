@@ -33,6 +33,7 @@ async function start() {
     await server.register(cors, {
       origin: process.env['NODE_ENV'] === 'production' ? [
         'https://cryptotrade-frontend-production.up.railway.app', // Production frontend
+        /^https:\/\.*railway\.internal$/, // Railway internal
         /^https:\/\/cryptotrade-frontend-.*\.up\.railway\.app$/ // Railway preview deployments
       ] : [
         'http://localhost:5173', // Local development
