@@ -41,14 +41,14 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 		},
 		heavy: { ordersPerSecond: 10000, duration: 10, label: "Heavy (10K/sec)" },
 		extreme: {
-			ordersPerSecond: 50000,
+			ordersPerSecond: 36000,
 			duration: 5,
-			label: "Extreme (50K/sec)",
+			label: "Hit limits (36K/sec)",
 		},
 		maximum: {
 			ordersPerSecond: 100000,
 			duration: 3,
-			label: "Maximum (100K/sec)",
+			label: "Overload (100K/sec)",
 		},
 	};
 
